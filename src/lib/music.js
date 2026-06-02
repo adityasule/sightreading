@@ -185,10 +185,31 @@ export function isOnStaff(card) {
   return card.midi >= bottom && card.midi <= top;
 }
 
+// The middle-C anchor cluster (M2b): middle C (MIDI 60) and its immediate
+// natural neighbours B3 (59) and D4 (62). Middle C is a *ledger* note on both
+// clefs, so on-staff-first ordering would normally defer it — but it is the
+// canonical reading reference, so the cluster anchors the very start of the
+// foundation, introduced before the rest of the on-staff naturals. See
+// GOALS.md → Design Notes → Middle C anchor.
+const ANCHOR_MIDIS = new Set([59, 60, 62]);
+
+/** Is this card part of the middle-C anchor cluster (natural B3 / C4 / D4)? */
+export function isAnchor(card) {
+  return card.accidental === '' && ANCHOR_MIDIS.has(card.midi);
+}
+
+// Sort key floating the anchor cluster to the front of its level, middle C
+// leading (distance from MIDI 60: C4→0, B3→1, D4→2). Non-anchor cards share a
+// large constant so they keep their on-staff-then-pitch order untouched.
+function anchorRank(card) {
+  return isAnchor(card) ? Math.abs(card.midi - 60) : 100;
+}
+
 // The canonical level index a card belongs to: naturals go to the foundation
-// (split by register), each black-key spelling to its home key.
+// (split by register, but the anchor cluster joins the on-staff sub-level even
+// though it is on ledger lines), each black-key spelling to its home key.
 function levelIndexFor(card) {
-  if (card.accidental === '') return isOnStaff(card) ? 0 : 1;
+  if (card.accidental === '') return isOnStaff(card) || isAnchor(card) ? 0 : 1;
   return SPELLING_LEVEL[card.letter + card.accidental];
 }
 
@@ -196,8 +217,10 @@ function levelIndexFor(card) {
  * Bucket a live deck into its ordered scale levels. Returns only the levels
  * that have at least one in-range card (so narrowing the range or disabling a
  * clef simply drops the levels that lose all their cards), each carrying its
- * `SCALE_SEQUENCE` metadata plus a `cards` array sorted on-staff-then-pitch —
- * the order new cards are introduced within the level.
+ * `SCALE_SEQUENCE` metadata plus a `cards` array sorted anchor-then-on-staff-
+ * then-pitch — the order new cards are introduced within the level. The anchor
+ * cluster only ever lands in the foundation (level 0), so the extra key is a
+ * no-op everywhere else.
  */
 export function levelsFor(deck) {
   const byIndex = new Map();
@@ -210,7 +233,10 @@ export function levelsFor(deck) {
   for (const meta of SCALE_SEQUENCE) {
     const cards = byIndex.get(meta.index);
     if (!cards || cards.length === 0) continue;
-    cards.sort((a, b) => isOnStaff(b) - isOnStaff(a) || a.midi - b.midi);
+    cards.sort(
+      (a, b) =>
+        anchorRank(a) - anchorRank(b) || isOnStaff(b) - isOnStaff(a) || a.midi - b.midi
+    );
     levels.push({ ...meta, cards });
   }
   return levels;

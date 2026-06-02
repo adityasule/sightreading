@@ -8,6 +8,7 @@ import {
   pcName,
   buildDeck,
   isOnStaff,
+  isAnchor,
   levelsFor,
   SCALE_SEQUENCE,
   DEFAULT_LEDGER_LINES,
@@ -157,8 +158,10 @@ describe('SCALE_SEQUENCE + levelsFor — curriculum bucketing', () => {
     const levels = levelsFor(buildDeck({ treble: true, bass: false, ledgerLines: 2 }));
     const onstaff = levels.find((l) => l.index === 0).cards;
     const ledger = levels.find((l) => l.index === 1).cards;
-    expect(onstaff.every((c) => c.accidental === '' && isOnStaff(c))).toBe(true);
-    expect(ledger.every((c) => c.accidental === '' && !isOnStaff(c))).toBe(true);
+    // Level 0 = on-staff naturals plus the middle-C anchor cluster (which is on
+    // ledger lines but pulled forward); level 1 = the remaining ledger naturals.
+    expect(onstaff.every((c) => c.accidental === '' && (isOnStaff(c) || isAnchor(c)))).toBe(true);
+    expect(ledger.every((c) => c.accidental === '' && !isOnStaff(c) && !isAnchor(c))).toBe(true);
   });
 
   it('introduces each black-key spelling in its home-key level', () => {
@@ -171,12 +174,51 @@ describe('SCALE_SEQUENCE + levelsFor — curriculum bucketing', () => {
   it('sorts each level on-staff before ledger, then by pitch', () => {
     const levels = levelsFor(buildDeck({ treble: true, bass: false, ledgerLines: 2 }));
     for (const lvl of levels) {
-      const onStaffFlags = lvl.cards.map(isOnStaff);
+      // The anchor cluster legitimately leads with ledger notes; the on-staff-
+      // before-ledger rule governs everything after it.
+      const rest = lvl.cards.filter((c) => !isAnchor(c));
+      const onStaffFlags = rest.map(isOnStaff);
       // No ledger card precedes an on-staff card.
       const firstLedger = onStaffFlags.indexOf(false);
       if (firstLedger !== -1) {
         expect(onStaffFlags.slice(firstLedger).some(Boolean)).toBe(false);
       }
     }
+  });
+});
+
+describe('Middle C anchor (cluster-first)', () => {
+  it('isAnchor matches the natural B3/C4/D4 cluster only', () => {
+    expect(isAnchor({ midi: 60, accidental: '' })).toBe(true); // middle C
+    expect(isAnchor({ midi: 59, accidental: '' })).toBe(true); // B3
+    expect(isAnchor({ midi: 62, accidental: '' })).toBe(true); // D4
+    expect(isAnchor({ midi: 57, accidental: '' })).toBe(false); // A3, outside
+    expect(isAnchor({ midi: 64, accidental: '' })).toBe(false); // E4, on-staff
+    expect(isAnchor({ midi: 61, accidental: '#' })).toBe(false); // C#4, not natural
+  });
+
+  it('routes the anchor cluster into the foundation (level 0), not ledger (level 1)', () => {
+    const levels = levelsFor(buildDeck({ treble: true, bass: true, ledgerLines: 2 }));
+    const onstaff = levels.find((l) => l.index === 0).cards;
+    const ledger = levels.find((l) => l.index === 1).cards;
+    // Both clefs contribute a middle-C card; both anchor to level 0.
+    expect(onstaff.filter(isAnchor)).toHaveLength(6); // {B3,C4,D4} × {treble,bass}
+    expect(ledger.some(isAnchor)).toBe(false);
+  });
+
+  it('introduces the anchor cluster first, middle C leading', () => {
+    const cards = levelsFor(buildDeck({ treble: true, bass: false, ledgerLines: 2 }))
+      .find((l) => l.index === 0).cards;
+    // First three cards are the anchor cluster, middle C ahead of its neighbours.
+    expect(cards.slice(0, 3).map((c) => c.midi)).toEqual([60, 59, 62]);
+    expect(cards.slice(3).some(isAnchor)).toBe(false); // nothing else is an anchor
+    expect(cards[3] && isOnStaff(cards[3])).toBe(true); // on-staff naturals follow
+  });
+
+  it('keeps the anchor inside level 0 even when only ledger notes are in range', () => {
+    // ledgerLines 0 is on-staff only → anchor notes fall out of range entirely.
+    const levels = levelsFor(buildDeck({ treble: true, bass: false, ledgerLines: 0 }));
+    expect(levels.find((l) => l.index === 0).cards.some(isAnchor)).toBe(false);
+    expect(levels.some((l) => l.index === 1)).toBe(false); // no ledger level at all
   });
 });

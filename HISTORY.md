@@ -89,6 +89,25 @@ param. As shipped:
    "Start [next level]?" gate, current level + progress in the quiz header.
 5. **Home surfacing (`Home.svelte`)** — current level name + progress.
 
+### Milestone 2b — Middle C anchor (cluster-first) ✅
+A curriculum tweak in `music.js` only — the scheduler and progression layers are
+untouched. Middle C is a *ledger* note on both clefs, so on-staff-first ordering
+would normally defer it; but it is the canonical reading reference, so it now
+anchors the very start of the foundation:
+- `isAnchor(card)` identifies the natural cluster B3/C4/D4 (MIDI 59/60/62).
+- `levelIndexFor` routes the anchor cluster into the foundation's on-staff
+  sub-level (index 0) instead of the ledger sub-level (1), the one place
+  on-staff-first is overridden.
+- `levelsFor`'s sort gained a leading `anchorRank` key (distance from MIDI 60, so
+  middle C leads, then B3, then D4); it is a no-op outside the foundation, where
+  no anchor cards land. New cards are introduced in `cards` order, so the quiz
+  now serves middle C → B3 → D4 before the rest of the on-staff naturals.
+- A returning user who had mastered level 0 but not the (formerly level-1)
+  middle-C cards simply re-opens level 0 until they reach box ≥ 2 — the same
+  self-correcting behaviour as a range/clef change.
+Covered by the M2a tests (`music.test.js` → "Middle C anchor"). Phase 0's
+note-name cards will inherit the same anchor when that view is built (M2c).
+
 ---
 
 ## Resolved design notes

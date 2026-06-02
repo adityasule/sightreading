@@ -213,10 +213,7 @@ cleanup first, productionization last**, in small submilestones.
   tests. Tidy small dups (e.g. the `.muted` style repeated in the Phase 2/3
   placeholder views). Tests become the safety net for everything after.
 
-**M2b — Middle C anchor (cluster-first)**
-- Curriculum tweak in `music.js`: middle C + its immediate on-staff neighbours
-  introduce as the first cluster of the foundation, overriding on-staff-first for
-  that cluster only. Covered by the M2a tests.
+**M2b — Middle C anchor (cluster-first)** ✅ shipped — see HISTORY.md.
 
 **M2c — Basics phase scaffold + note-name cards** *(Phase 0, part 1)*
 - New `Basics` view (route id `phase0`, storage `srt:phase0`); `phases.js`
