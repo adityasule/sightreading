@@ -6,14 +6,14 @@
   import Settings from './views/Settings.svelte';
   import ThemeButton from './lib/ThemeButton.svelte';
   import { nav, go } from './lib/nav.svelte.js';
+  import { PHASES } from './lib/phases.js';
 
-  // User-facing labels are musical names; the ids stay as internal route ids
-  // ('phase1' etc.) so storage keys and scheduler state are untouched.
+  // Phase labels come from the shared config; Home/Settings/etc. wraps it so a
+  // rename lives in one place. Internal route ids are untouched.
+  const components = { phase1: Phase1, phase2: Phase2, phase3: Phase3 };
   const views = [
     { id: 'home', label: 'Home', component: Home },
-    { id: 'phase1', label: 'Notation', component: Phase1 },
-    { id: 'phase2', label: 'Chords', component: Phase2 },
-    { id: 'phase3', label: 'Key Signatures', component: Phase3 },
+    ...PHASES.map((p) => ({ id: p.id, label: p.name, component: components[p.id] })),
     { id: 'settings', label: 'Settings', component: Settings },
   ];
 

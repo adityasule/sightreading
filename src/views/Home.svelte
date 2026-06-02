@@ -3,6 +3,7 @@
   import { settings } from '../lib/settings.svelte.js';
   import { buildDeck } from '../lib/music.js';
   import * as srs from '../lib/spaced-repetition.js';
+  import { PHASES } from '../lib/phases.js';
 
   // Notation "Today" snapshot. Loaded once on mount (Home remounts on every
   // navigation), then derived against the live deck so it tracks settings.
@@ -22,27 +23,6 @@
           : { label: 'Practice notes', to: 'phase1' }
   );
 
-  // User-facing musical names; route ids stay as the internal phase ids.
-  const phases = [
-    {
-      id: 'phase1',
-      title: 'Notation',
-      blurb: 'Read one note on the treble & bass clef.',
-      ready: true,
-    },
-    {
-      id: 'phase2',
-      title: 'Chords',
-      blurb: 'Identify major / minor three-note chords.',
-      ready: false,
-    },
-    {
-      id: 'phase3',
-      title: 'Key Signatures',
-      blurb: 'Name the major key from its signature.',
-      ready: false,
-    },
-  ];
 </script>
 
 <div class="view">
@@ -85,10 +65,10 @@
   </section>
 
   <div class="phases">
-    {#each phases as p}
+    {#each PHASES as p}
       <button type="button" class="card phase" onclick={() => go(p.id)}>
         <span class="badge" class:soon={!p.ready}>{p.ready ? 'Now' : 'Soon'}</span>
-        <h3>{p.title}</h3>
+        <h3>{p.name}</h3>
         <p class="muted">{p.blurb}</p>
       </button>
     {/each}
