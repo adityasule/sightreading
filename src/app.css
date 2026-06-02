@@ -1,0 +1,232 @@
+/* ==========================================================================
+   Design tokens
+   --------------------------------------------------------------------------
+   Minimalist, neutral-gray surfaces with a single teal accent. Two themes:
+
+     - default                  → light
+     - @media dark              → dark   (when no manual override)
+     - :root[data-theme="dark"] → dark   (manual override, any system pref)
+     - :root[data-theme="light"]→ light  (manual override, any system pref)
+
+   The dark palette is declared twice on purpose: once for the system
+   preference and once for the explicit override. Keep the two blocks in sync.
+   ========================================================================== */
+
+:root {
+  /* Surfaces (low → high elevation) */
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+
+  /* Text */
+  --fg: #18181b;
+  --muted: #71717a;
+
+  /* Lines */
+  --border: #e4e4e7;
+
+  /* Teal accent */
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-fg: #ffffff; /* text/icon sitting on a solid accent fill */
+  --accent-weak: rgba(13, 148, 136, 0.1); /* tinted backgrounds */
+
+  /* Feedback (distinct from the teal accent on purpose) */
+  --good: #16a34a;
+  --good-weak: rgba(22, 163, 74, 0.12);
+  --bad: #dc2626;
+  --bad-weak: rgba(220, 38, 38, 0.12);
+
+  /* Focus ring */
+  --ring: var(--accent);
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+
+  /* Geometry */
+  --radius: 10px;
+  --radius-sm: 7px;
+
+  color-scheme: light;
+}
+
+/* Dark palette — shared between the system-preference and override cases. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f10;
+    --surface: #18181b;
+    --surface-2: #232327;
+    --fg: #f4f4f5;
+    --muted: #a1a1aa;
+    --border: #2a2a2e;
+    --accent: #2dd4bf;
+    --accent-hover: #5eead4;
+    --accent-fg: #04211d;
+    --accent-weak: rgba(45, 212, 191, 0.15);
+    --good: #4ade80;
+    --good-weak: rgba(74, 222, 128, 0.15);
+    --bad: #f87171;
+    --bad-weak: rgba(248, 113, 113, 0.15);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0f10;
+  --surface: #18181b;
+  --surface-2: #232327;
+  --fg: #f4f4f5;
+  --muted: #a1a1aa;
+  --border: #2a2a2e;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-fg: #04211d;
+  --accent-weak: rgba(45, 212, 191, 0.15);
+  --good: #4ade80;
+  --good-weak: rgba(74, 222, 128, 0.15);
+  --bad: #f87171;
+  --bad-weak: rgba(248, 113, 113, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Smoothly cross-fade when the theme flips, but never animate layout/motion
+   for users who'd rather not. */
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5em;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.4rem;
+}
+h3 {
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Consistent, accessible focus ring across all interactive elements. */
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  min-height: 44px; /* touch target */
+  transition: background-color 0.12s ease, border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:active {
+  background: var(--surface-2);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary call-to-action */
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* ==========================================================================
+   Card
+   ========================================================================== */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+}
