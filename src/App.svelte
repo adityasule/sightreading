@@ -1,5 +1,6 @@
 <script>
   import Home from './views/Home.svelte';
+  import Phase0 from './views/Phase0.svelte';
   import Phase1 from './views/Phase1.svelte';
   import Phase2 from './views/Phase2.svelte';
   import Phase3 from './views/Phase3.svelte';
@@ -10,7 +11,7 @@
 
   // Phase labels come from the shared config; Home/Settings/etc. wraps it so a
   // rename lives in one place. Internal route ids are untouched.
-  const components = { phase1: Phase1, phase2: Phase2, phase3: Phase3 };
+  const components = { phase0: Phase0, phase1: Phase1, phase2: Phase2, phase3: Phase3 };
   const views = [
     { id: 'home', label: 'Home', component: Home },
     ...PHASES.map((p) => ({ id: p.id, label: p.name, component: components[p.id] })),

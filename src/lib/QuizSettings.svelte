@@ -4,12 +4,28 @@
   // input method; the full set lives in the Settings tab.
   import { settings, setSetting } from './settings.svelte.js';
 
-  let open = $state(false);
+  // Quick-setting field definitions. A view passes the keys it wants surfaced
+  // via the `fields` prop (Phase 1 → answer mode; Basics → duration names); the
+  // full settings set still lives in the Settings tab.
+  const FIELDS = {
+    answerMode: {
+      label: 'Input method',
+      options: [
+        { value: 'letters', label: 'Letters' },
+        { value: 'piano', label: 'Piano' },
+      ],
+    },
+    durationNames: {
+      label: 'Duration names',
+      options: [
+        { value: 'british', label: 'British' },
+        { value: 'american', label: 'American' },
+      ],
+    },
+  };
 
-  const modes = [
-    { value: 'letters', label: 'Letters' },
-    { value: 'piano', label: 'Piano' },
-  ];
+  let { fields = ['answerMode'] } = $props();
+  let open = $state(false);
 
   function close() {
     open = false;
@@ -54,21 +70,24 @@
     <div class="popover" role="dialog" aria-label="Quick settings">
       <h3>Quick settings</h3>
 
-      <div class="field">
-        <span class="field-label" id="qs-input">Input method</span>
-        <div class="segmented" role="group" aria-labelledby="qs-input">
-          {#each modes as opt}
-            <button
-              type="button"
-              class="seg"
-              aria-pressed={settings.answerMode === opt.value}
-              onclick={() => setSetting('answerMode', opt.value)}
-            >
-              {opt.label}
-            </button>
-          {/each}
+      {#each fields as key}
+        {@const f = FIELDS[key]}
+        <div class="field">
+          <span class="field-label" id={`qs-${key}`}>{f.label}</span>
+          <div class="segmented" role="group" aria-labelledby={`qs-${key}`}>
+            {#each f.options as opt}
+              <button
+                type="button"
+                class="seg"
+                aria-pressed={settings[key] === opt.value}
+                onclick={() => setSetting(key, opt.value)}
+              >
+                {opt.label}
+              </button>
+            {/each}
+          </div>
         </div>
-      </div>
+      {/each}
 
       <p class="muted hint">More options in the Settings tab.</p>
     </div>
@@ -135,6 +154,9 @@
     font-size: 0.95rem;
   }
 
+  .field + .field {
+    margin-top: 14px;
+  }
   .field-label {
     display: block;
     font-size: 0.85rem;

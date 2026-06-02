@@ -44,16 +44,17 @@ browser. (Future option: opt-in export/import a JSON blob.)
 ## Phases
 
 ### Phase 0 — Basics (new feature — M2)
-A gentle, multiple-choice on-ramp *before* note recall. Where Phase 1 is recall
-(Letters/Piano) with ledger lines, accidentals and scale progression, Phase 0 is
-recognition: multiple choice, on-staff only, absolute-beginner.
+A gentle, multiple-choice on-ramp *before* note recall. Where Phase 1 reads
+*pitch* (Letters/Piano) with ledger lines, accidentals and scale progression,
+Phase 0 is *symbol* recognition — durations, rests, and clefs — by multiple
+choice, for the absolute beginner. Note naming is pitch reading, so it belongs
+to Phase 1, not here.
 
 **In scope**
-- **Note-name cards** — render one on-staff note; user picks its letter name from
-  multiple choice. On-staff notes only (no ledger lines) **except middle C**,
-  which anchors the very start (see Design Notes → Middle C anchor).
-- **Note time-value cards** — render a single note of a given duration; user
-  picks the duration name. Coverage: sixteenth → double whole (6 values).
+- **Note time-value cards** ✅ (M2c) — render a single note of a given duration
+  on a *clef-less* staff at a fixed position; user picks the duration name. The
+  note's pitch is never shown or named (that is Phase 1). Coverage: sixteenth →
+  double whole (6 values).
 - **Rest time-value cards** — render a rest glyph; user picks its duration name.
   Same 6 values.
 - **Clef-symbol cards** — render a lone clef; user identifies treble vs bass.
@@ -65,8 +66,8 @@ recognition: multiple choice, on-staff only, absolute-beginner.
   user-facing name **Basics**.
 
 **Out of scope (Phase 0)**
-- Ledger-line notes beyond the middle-C anchor, accidentals, dotted/tied
-  durations, time signatures, and recall/typed input (that is Phase 1).
+- Pitch reading / note naming, accidentals, tied durations, time signatures, and
+  recall/typed input (all Phase 1 or later). Dotted notes are planned for M2d.
 
 ### Phase 1 — Single notes, treble & bass clef ✅ shipped
 Single-note reading on both clefs, naturals + accidentals, Letters/Piano answer
@@ -139,9 +140,9 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 ### Music rendering
 - VexFlow renders to SVG. Minimal — no time signatures, no measure bars.
 - Single staff: one note (Phase 1) or 3 stacked notes (Phase 2).
-- Phase 0 also renders, in isolation: a lone clef (clef-symbol cards), a single
-  note of a given duration (note time-value cards), and a rest glyph (rest
-  time-value cards).
+- Phase 0 also renders, in isolation: a single clef-less note of a given
+  duration (note time-value cards), a rest glyph (rest time-value cards), and a
+  lone clef (clef-symbol cards).
 - **Font race:** await `VexFlow.loadFonts('Bravura', 'Academico')` before the
   first render, or glyph metrics are wrong on first paint (see M1c in HISTORY).
 
@@ -150,10 +151,11 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
   correct), distinct from the Phase 1 Letters/Piano pads. Touch-friendly, 44px
   targets, keyboard-selectable on desktop.
 - **Card types** share one `srt:phase0` deck through the generic scheduler:
-  note-name, note-duration, rest-duration, clef-symbol. Each card carries its
-  type so the renderer and the option set can branch.
-- **On-staff only** for note-name cards (no ledger lines), except the middle-C
-  anchor — keeps Phase 0 the gentle on-ramp; ledger reading lives in Phase 1.
+  note-duration (M2c), rest-duration, clef-symbol. Each card carries its `type`
+  so the renderer and the option set can branch.
+- **Clef-less, fixed-position rendering** for duration/rest cards: the glyph
+  sits at a fixed staff position with no clef drawn, since pitch is irrelevant
+  here and clef symbols aren't introduced until the clef-symbol cards.
 - **Duration naming** honours the British/American setting (default British):
 
   | American          | British      |
@@ -173,10 +175,11 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 "Start at the very beginning with middle C" reinforces middle C as the reading
 reference. Middle C is a *ledger* note on both clefs, which would normally be
 deferred by the on-staff-first ordering — so it is an explicit exception. In
-both Phase 0 note-name cards and Phase 1's foundation level, middle C plus its
-immediate on-staff neighbours (the B3/D4 region) are introduced as the **first
-small cluster**, overriding on-staff-first for that cluster only; the rest of the
-on-staff naturals follow, then ledger lines as before.
+Phase 1's foundation level, middle C plus its immediate on-staff neighbours (the
+B3/D4 region) are introduced as the **first small cluster**, overriding
+on-staff-first for that cluster only; the rest of the on-staff naturals follow,
+then ledger lines as before. (Phase 0 has no note-name cards, so the anchor is a
+Phase 1 concept only.)
 
 ### Progress view
 A dedicated nav view (route id `progress`) showing progress across every phase,
@@ -209,18 +212,16 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2b — Middle C anchor (cluster-first)** ✅ shipped — see HISTORY.md.
 
-**M2c — Basics phase scaffold + note-name cards** *(Phase 0, part 1)*
-- New `Basics` view (route id `phase0`, storage `srt:phase0`); `phases.js`
-  `phase0` entry; nav + Home surfacing.
-- Reusable multiple-choice answer component (4 options).
-- First card type: note-name recognition (on-staff only + middle-C anchor),
-  reusing the generic scheduler.
-- Naming-convention setting (British default) added to Settings (used in M2d).
+**M2c — Basics phase scaffold + note time-value cards** ✅ shipped — see HISTORY.md.
 
-**M2d — Basics phase: durations, rests & clef cards** *(Phase 0, part 2)*
-- Note time-value and rest time-value cards (sixteenth → double whole), VexFlow
-  rendering of duration/rest glyphs; option labels honour British/American.
+**M2d — Basics phase: rests, clef cards & dotted notes** *(Phase 0, part 2)*
+- Rest time-value cards (sixteenth → double whole), VexFlow rendering of rest
+  glyphs; option labels honour British/American. (Note time-value cards shipped
+  in M2c.)
 - Clef-symbol cards (lone treble/bass clef).
+- Dotted notes — modifying a note's length by adding a dot (e.g. a dotted
+  half = 3 beats). Detailed scope, UX, and implementation to be planned when
+  this milestone is picked up.
 
 **M2e — Progress view**
 - New `Progress` view + route, completion bar per phase read from each
@@ -273,11 +274,18 @@ cleanup first, productionization last**, in small submilestones.
 - **Testing** → add **Vitest** for the pure-logic modules only (M2a); UI stays
   manual-verify. Dev-only, so the no-backend constraint is untouched.
 - **Middle C** → **anchor cluster first**: middle C + immediate on-staff
-  neighbours introduce before the rest of the on-staff naturals, in both Phase 0
-  and Phase 1's foundation.
+  neighbours introduce before the rest of the on-staff naturals, in Phase 1's
+  foundation (see the 2026-06-03 pivot below — this is Phase 1 only).
 - **80 cards (not 88)** → the deck is notes within ±`ledgerLines` of each staff
   per enabled clef, with 2 spellings per black key — not the 88-key board. 80 is
   the default-range total; it scales with the range setting.
 - **Same pitch on two clefs** → kept as distinct cards (`treble:60` vs
   `bass:60`) — different visual skill; level completion already treats the pitch
   class as one skill across clefs.
+
+### Resolved (2026-06-03, M2c)
+- **Phase 0 = symbol recognition, not note naming** → dropped the planned
+  note-name cards. Reading pitch is Phase 1's job; Basics teaches the *vocabulary*
+  of notation — durations (M2c), then rests / clefs / dotted notes (M2d). Duration
+  cards render on a clef-less staff at a fixed position (pitch hidden, never
+  named). The middle-C anchor is therefore a Phase 1 concept only.

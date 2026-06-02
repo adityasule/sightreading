@@ -13,6 +13,11 @@
     { value: 'letters', label: 'Letters' },
     { value: 'piano', label: 'Piano' },
   ];
+
+  const durationNameOpts = [
+    { value: 'british', label: 'British' },
+    { value: 'american', label: 'American' },
+  ];
 </script>
 
 <div class="view">
@@ -124,6 +129,28 @@
       >
         +
       </button>
+    </div>
+  </section>
+
+  <section class="card setting">
+    <div class="setting-text">
+      <h3>Duration names</h3>
+      <p class="muted">
+        Naming for the Basics note-value cards — British (crotchet, quaver) or
+        American (quarter, eighth).
+      </p>
+    </div>
+    <div class="segmented" role="group" aria-label="Duration names">
+      {#each durationNameOpts as opt}
+        <button
+          type="button"
+          class="seg"
+          aria-pressed={settings.durationNames === opt.value}
+          onclick={() => setSetting('durationNames', opt.value)}
+        >
+          {opt.label}
+        </button>
+      {/each}
     </div>
   </section>
 

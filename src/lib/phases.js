@@ -5,6 +5,12 @@
 // happens in one place.
 export const PHASES = [
   {
+    id: 'phase0',
+    name: 'Basics',
+    blurb: 'Identify note durations — multiple choice.',
+    ready: true,
+  },
+  {
     id: 'phase1',
     name: 'Notation',
     blurb: 'Read one note on the treble & bass clef.',

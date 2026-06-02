@@ -4,11 +4,13 @@
  * Mirrors theme.svelte.js: a `$state` object the UI binds to, plus an
  * explicit setter that persists. No backend; this is per-device.
  *
- *   answerMode      'letters' | 'piano'   how the user inputs an answer
- *   treble / bass   booleans              which clefs are in the deck
- *   newCardsPerDay  number                new-card introduction budget / day
- *   ledgerLines     number                ledger lines above/below each staff
- *                                         (deck range size)
+ *   answerMode      'letters' | 'piano'    how the user inputs an answer (Phase 1)
+ *   treble / bass   booleans               which clefs are in the deck
+ *   newCardsPerDay  number                 new-card introduction budget / day
+ *   ledgerLines     number                 ledger lines above/below each staff
+ *                                          (deck range size)
+ *   durationNames   'british' | 'american' note-value naming for Basics cards
+ *                                          (default British)
  */
 
 import { DEFAULT_LEDGER_LINES } from './music.js';
@@ -24,6 +26,7 @@ const DEFAULTS = {
   bass: true,
   newCardsPerDay: 5,
   ledgerLines: DEFAULT_LEDGER_LINES,
+  durationNames: 'british',
 };
 
 function read() {

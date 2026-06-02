@@ -120,8 +120,46 @@ anchors the very start of the foundation:
 - A returning user who had mastered level 0 but not the (formerly level-1)
   middle-C cards simply re-opens level 0 until they reach box ≥ 2 — the same
   self-correcting behaviour as a range/clef change.
-Covered by the M2a tests (`music.test.js` → "Middle C anchor"). Phase 0's
-note-name cards will inherit the same anchor when that view is built (M2c).
+Covered by the M2a tests (`music.test.js` → "Middle C anchor"). The anchor is a
+Phase 1 concept: M2c later pivoted Phase 0 to duration cards with no note-name
+cards (see M2c below).
+
+### Milestone 2c — Basics phase scaffold + note time-value cards ✅
+Phase 0 (user-facing **Basics**): the gentle multiple-choice on-ramp before
+Phase 1's pitch reading. **Pivoted mid-build from note-name to note time-value
+cards** — Basics is symbol recognition, not pitch reading (reading note names
+*is* Phase 1, so it doesn't belong here).
+- **Card model + deck (`music.js`)** — `buildBasicsDeck()` returns the six
+  duration cards (sixteenth → double whole), in teaching order; each carries a
+  `value`/`vex`/labels. `durationLabel(value, convention)` + `DURATION_VALUES`
+  drive the British/American option labels; generic `choices(correct, pool,
+  count)` builds the shuffled 4-option set (reused by every Basics card type to
+  come).
+- **Basics view (`Phase0.svelte`)** — renders a single note of the card's
+  duration on a *clef-less* staff at a fixed position (treble e4; pitch hidden
+  and never named — clefs aren't introduced yet), asks "What kind of note is
+  this?", grades by duration value. Reuses the generic scheduler + in-session
+  relearning (RELEARN_GAP 3) + auto-advance + caught-up/practice, minus
+  progression and the Letters/Piano answer modes.
+- **Multiple-choice pad (`Choices.svelte`)** — reusable and card-agnostic (the
+  view grades; the pad renders states + reports a pick); 1–N hardware keys;
+  correct/wrong colouring on reveal.
+- **Quick settings** — `QuizSettings.svelte` generalised to a `fields` prop:
+  Basics surfaces a British/American **Duration names** toggle that relabels the
+  current card live (option labels derived, not frozen), Notation keeps its
+  input-method control. `durationNames` setting (British default) added to the
+  store + Settings tab.
+- **Wiring** — `phases.js` `phase0` entry (`ready: true`); `App.svelte` map; nav
+  + Home pick it up automatically. Order: Home · Basics · Notation · Chords ·
+  Key Signatures · Settings.
+- **Shared renderer + dev tool** — the staff drawing was extracted to
+  `src/lib/render.js` (`drawDurationNote`), shared by the view and a new
+  `npm run render:basics` script (Node + jsdom, dev-only) that emits
+  self-contained SVGs (Bravura font embedded as a data URI) through the *same*
+  code path — fast iteration without launching a browser, with the browser still
+  the source of truth. VexFlow `'1/2'` renders the breve; SOFT voice mode lets a
+  single note of any duration format.
+- 67 unit tests (up from 59): duration deck + `durationLabel` + `choices`.
 
 ---
 

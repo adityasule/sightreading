@@ -284,3 +284,77 @@ const PC_NAMES = {
 export function pcName(pc) {
   return PC_NAMES[pc];
 }
+
+// ── Phase 0 (Basics) ─────────────────────────────────────────────────────────
+//
+// The gentle, multiple-choice on-ramp before Phase 1's pitch reading. Basics is
+// symbol recognition, not note naming: the user identifies a note's *time value*
+// (its duration) — and, from M2d, rests and clef symbols. Pitch is deliberately
+// out of scope here (reading note names is Phase 1 / Notation), so duration
+// cards render on a *clef-less* staff at a fixed position and the note is never
+// named. Phase 0 persists under its own blob (srt:phase0) and reuses the generic
+// scheduler + the multiple-choice answer pad.
+
+/** In-place Fisher–Yates shuffle; returns the same array for chaining. */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * A shuffled multiple-choice set for a Basics card: the `correct` value plus
+ * distinct distractors drawn from `pool`, `count` entries total (clamped to the
+ * pool size). Generic over the card kind so every Basics type — note name and,
+ * from M2d, duration / rest / clef — shares one option builder. The correct
+ * answer's slot is randomised so its position never gives it away.
+ */
+export function choices(correct, pool, count = 4) {
+  const distractors = shuffle(pool.filter((v) => v !== correct));
+  return shuffle([correct, ...distractors.slice(0, Math.max(0, count - 1))]);
+}
+
+// The six note durations, sixteenth → double whole (GOALS Phase 0 scope). Each
+// becomes one card; `value` is the stable, naming-independent grading key (and
+// id suffix), `vex` the VexFlow duration code, and british/american the display
+// labels picked by the Settings naming convention. Ordered longest-common-first
+// (the order new cards are introduced); the rare breve comes last.
+const DURATIONS = [
+  { value: 'whole', vex: 'w', british: 'Semibreve', american: 'Whole note' },
+  { value: 'half', vex: 'h', british: 'Minim', american: 'Half note' },
+  { value: 'quarter', vex: 'q', british: 'Crotchet', american: 'Quarter note' },
+  { value: 'eighth', vex: '8', british: 'Quaver', american: 'Eighth note' },
+  { value: 'sixteenth', vex: '16', british: 'Semiquaver', american: 'Sixteenth note' },
+  { value: 'breve', vex: '1/2', british: 'Breve', american: 'Double whole note' },
+];
+
+const DURATION_BY_VALUE = Object.fromEntries(DURATIONS.map((d) => [d.value, d]));
+
+/** The duration grading keys, in teaching order — also the `choices` pool. */
+export const DURATION_VALUES = DURATIONS.map((d) => d.value);
+
+/**
+ * Display label for a duration `value` under a naming convention. Defaults to
+ * British (semibreve, minim, crotchet, …); 'american' gives whole/half/quarter.
+ */
+export function durationLabel(value, convention = 'british') {
+  const d = DURATION_BY_VALUE[value];
+  return convention === 'american' ? d.american : d.british;
+}
+
+/**
+ * Build the Phase 0 deck: one note time-value card per duration, in teaching
+ * order. Clef- and range-independent (pitch is out of scope here), so unlike
+ * the Phase 1 deck it takes no settings — the answer *labels*, not the cards,
+ * follow the British/American naming convention.
+ */
+export function buildBasicsDeck() {
+  return DURATIONS.map((d) => ({
+    type: 'duration',
+    id: `dur:${d.value}`,
+    value: d.value,
+    vex: d.vex,
+  }));
+}

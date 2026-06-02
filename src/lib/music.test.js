@@ -7,6 +7,10 @@ import {
   pcOf,
   pcName,
   buildDeck,
+  buildBasicsDeck,
+  choices,
+  durationLabel,
+  DURATION_VALUES,
   isOnStaff,
   isAnchor,
   levelsFor,
@@ -220,5 +224,67 @@ describe('Middle C anchor (cluster-first)', () => {
     const levels = levelsFor(buildDeck({ treble: true, bass: false, ledgerLines: 0 }));
     expect(levels.find((l) => l.index === 0).cards.some(isAnchor)).toBe(false);
     expect(levels.some((l) => l.index === 1)).toBe(false); // no ledger level at all
+  });
+});
+
+describe('buildBasicsDeck — Phase 0 duration deck', () => {
+  it('is one duration card per note value, in teaching order, unique ids', () => {
+    const deck = buildBasicsDeck();
+    expect(deck).toHaveLength(DURATION_VALUES.length);
+    expect(deck.every((c) => c.type === 'duration')).toBe(true);
+    expect(deck.map((c) => c.value)).toEqual(DURATION_VALUES);
+    expect(new Set(deck.map((c) => c.id)).size).toBe(deck.length);
+  });
+
+  it('carries a VexFlow duration code per card (incl. the breve)', () => {
+    const deck = buildBasicsDeck();
+    expect(deck.every((c) => typeof c.vex === 'string' && c.vex.length > 0)).toBe(true);
+    expect(deck.find((c) => c.value === 'breve').vex).toBe('1/2');
+    expect(deck.find((c) => c.value === 'quarter').vex).toBe('q');
+  });
+
+  it('is clef- and range-independent (takes no settings)', () => {
+    // Same six cards no matter what; pitch/clef are out of scope for Basics.
+    expect(buildBasicsDeck().map((c) => c.id)).toEqual(
+      buildBasicsDeck().map((c) => c.id)
+    );
+  });
+});
+
+describe('durationLabel — British / American naming', () => {
+  it('defaults to British names', () => {
+    expect(durationLabel('whole')).toBe('Semibreve');
+    expect(durationLabel('quarter')).toBe('Crotchet');
+    expect(durationLabel('eighth')).toBe('Quaver');
+    expect(durationLabel('breve')).toBe('Breve');
+  });
+
+  it('switches to American names', () => {
+    expect(durationLabel('whole', 'american')).toBe('Whole note');
+    expect(durationLabel('quarter', 'american')).toBe('Quarter note');
+    expect(durationLabel('eighth', 'american')).toBe('Eighth note');
+    expect(durationLabel('breve', 'american')).toBe('Double whole note');
+  });
+});
+
+describe('choices — multiple-choice option builder', () => {
+  it('returns `count` distinct options including the correct one', () => {
+    const opts = choices('C', LETTERS);
+    expect(opts).toHaveLength(4);
+    expect(opts).toContain('C');
+    expect(new Set(opts).size).toBe(4);
+    expect(opts.every((o) => LETTERS.includes(o))).toBe(true);
+  });
+
+  it('never repeats the correct value among the distractors', () => {
+    for (let i = 0; i < 50; i++) {
+      expect(choices('E', LETTERS).filter((o) => o === 'E')).toHaveLength(1);
+    }
+  });
+
+  it('clamps to the pool size when count exceeds it', () => {
+    const opts = choices('C', ['C', 'D'], 4);
+    expect(opts).toHaveLength(2);
+    expect(new Set(opts)).toEqual(new Set(['C', 'D']));
   });
 });

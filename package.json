@@ -8,10 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "render:basics": "node scripts/render-basics.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "jsdom": "^29.1.1",
     "svelte": "^5.0.0",
     "vite": "^6.0.0",
     "vitest": "^4.1.8"
