@@ -1,0 +1,56 @@
+# CLAUDE.md
+
+Guidance for working in this repo. Read [GOALS.md](./GOALS.md) for the plan and
+scope; [HISTORY.md](./HISTORY.md) for shipped work and resolved design decisions.
+
+## What this is
+A fully client-side, static web app for sight-reading practice with spaced
+repetition. **No backend, no database, no runtime APIs** — this is a hard
+architectural constraint (see GOALS → Architecture Decision), not an accident.
+Don't introduce a server, fetch, or third-party runtime call without flagging it.
+
+## Commands
+```bash
+npm install
+npm run dev      # vite dev server on :5173 (also on LAN — see README for phone testing)
+npm run build    # production build → ./dist
+npm run preview  # serve ./dist on :4173
+```
+There is **no test runner and no linter** configured. "Verify" means running the
+app (`npm run dev`) and exercising the change in the browser.
+
+## Architecture
+Svelte 5 + Vite SPA. View-switching by simple state, no router.
+
+- `src/main.js` — Svelte mount; `src/App.svelte` — shell, nav + view switching.
+- `src/views/` — one component per nav section: `Home`, `Phase1` (the only
+  built quiz), `Phase2`, `Phase3` (placeholders), `Settings`.
+- `src/lib/`
+  - `music.js` — MIDI↔note helpers, `buildDeck(settings)`, and the scale
+    curriculum (`SCALE_SEQUENCE`, `levelsFor`, `isOnStaff`).
+  - `spaced-repetition.js` — generic Leitner scheduler. **Keep it
+    card-agnostic** (no knowledge of notes/chords/levels) so every phase reuses
+    it and the SM-2 swap stays local. Key fns: `pickNext` (takes an optional
+    `newPool`), `recordAnswer`, `boxAtLeast`, `summary`.
+  - `progression.js` — the curriculum layer on top of the scheduler
+    (`progress`, `advance`, `MASTER_BOX`).
+  - `settings.svelte.js` — reactive, persisted quiz settings.
+  - `phases.js` — single source of truth for phase id↔display-name mapping.
+  - `Piano.svelte`, `QuizSettings.svelte`, `theme.svelte.js`, `nav.svelte.js`.
+- `src/app.css` — global styles + dark-mode theme tokens.
+
+## Conventions that matter
+- **"Phase 1/2/3" is dev shorthand — never show it in the UI.** Users see
+  musical names (Notation / Chords / Key Signatures); the mapping lives in
+  `phases.js`. Internal route ids (`phase1`) and storage keys (`srt:phase1`)
+  stay as-is.
+- **State** persists as one JSON blob per phase in `localStorage` (`srt:phase1`).
+- **VexFlow font race:** await `VexFlow.loadFonts('Bravura', 'Academico')`
+  before the first render or first-paint glyph metrics are wrong.
+- Hand-rolled CSS only — no Tailwind / UI library (keeps the bundle small).
+- Mobile-first: side nav ≥760px, hamburger drawer below; 44px min touch targets.
+
+## Workflow
+- Commit only when asked. Match the existing concise, milestone-tagged commit
+  style (`git log` for examples). When a milestone ships, move its detail from
+  GOALS.md into HISTORY.md to keep the plan lean.
