@@ -223,6 +223,9 @@ cleanup first, productionization last**, in small submilestones.
 - New `Progress` view + route, completion bar per phase read from each
   `srt:phaseN` blob. Notation shows two bars (scale-level progression + note
   mastery). Unbuilt phases show locked/empty.
+- Manual deck top-up: when 0 new cards are left in the active pool, let the user
+  explicitly add more cards to the deck (so practice can continue past the
+  current level instead of dead-ending).
 
 **M2f — Engineering hardening & PWA** *(productionization)*
 - Web app manifest + service worker for offline use (PWA).
