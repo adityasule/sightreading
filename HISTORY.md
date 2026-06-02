@@ -89,6 +89,21 @@ param. As shipped:
    "Start [next level]?" gate, current level + progress in the quiz header.
 5. **Home surfacing (`Home.svelte`)** — current level name + progress.
 
+### Milestone 2a — Test harness + code review & simplify ✅
+Added **Vitest** (dev-only, never shipped) covering the three pure-logic modules
+via colocated `src/lib/*.test.js`:
+- `music.js` — MIDI/note helpers, `buildDeck` range math (the 80-card default
+  deck), `isOnStaff`, and `SCALE_SEQUENCE`/`levelsFor` curriculum bucketing.
+- `spaced-repetition.js` — `introduce`/`recordAnswer`, `pickNext` (`newPool`
+  gating), `masteredCount`/`boxAtLeast`, `summary`/`stats`, and the
+  `loadState`/`saveState` round-trip.
+- `progression.js` — level resolution, the `advance` gate, and pre-M1d migration.
+
+55 tests at ship (59 after M2b's anchor tests). `npm test` documented in README +
+CLAUDE.md. Cleanup surfaced while writing them: dropped the duplicated local
+`.muted` style from the Phase 2/3 placeholders (the global rule in `app.css` is
+identical). These tests are the safety net for the rest of Milestone 2.
+
 ### Milestone 2b — Middle C anchor (cluster-first) ✅
 A curriculum tweak in `music.js` only — the scheduler and progression layers are
 untouched. Middle C is a *ledger* note on both clefs, so on-staff-first ordering

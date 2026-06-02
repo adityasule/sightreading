@@ -205,13 +205,7 @@ Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
 the engineering hardening to ship publicly. Sequenced **feature / bugfix /
 cleanup first, productionization last**, in small submilestones.
 
-**M2a — Test harness + code review & simplify** *(cleanup/bugfix, base first)*
-- Add **Vitest** (dev-only, never shipped) and unit-test the pure-logic modules:
-  `music.js`, `spaced-repetition.js`, `progression.js` (range math, deck build,
-  scheduler/migration, level bucketing). Document `npm test` in README + CLAUDE.md.
-- General code review for bugs; apply simplifications surfaced by writing the
-  tests. Tidy small dups (e.g. the `.muted` style repeated in the Phase 2/3
-  placeholder views). Tests become the safety net for everything after.
+**M2a — Test harness + code review & simplify** ✅ shipped — see HISTORY.md.
 
 **M2b — Middle C anchor (cluster-first)** ✅ shipped — see HISTORY.md.
 
