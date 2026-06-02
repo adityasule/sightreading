@@ -10,7 +10,17 @@ import {
   buildBasicsDeck,
   choices,
   durationLabel,
+  noteLabel,
+  restLabel,
+  clefLabel,
+  basicsLabel,
+  beatsForKey,
+  beatsLabel,
+  optionPoolFor,
   DURATION_VALUES,
+  NOTE_KEYS,
+  REST_VALUES,
+  CLEF_VALUES,
   isOnStaff,
   isAnchor,
   levelsFor,
@@ -227,27 +237,146 @@ describe('Middle C anchor (cluster-first)', () => {
   });
 });
 
-describe('buildBasicsDeck — Phase 0 duration deck', () => {
-  it('is one duration card per note value, in teaching order, unique ids', () => {
+describe('buildBasicsDeck — Phase 0 deck (notes, rests, clefs)', () => {
+  it('has note (6 plain + 3 dotted), rest (6) and clef (2) cards, unique ids', () => {
     const deck = buildBasicsDeck();
-    expect(deck).toHaveLength(DURATION_VALUES.length);
-    expect(deck.every((c) => c.type === 'duration')).toBe(true);
-    expect(deck.map((c) => c.value)).toEqual(DURATION_VALUES);
+    expect(deck).toHaveLength(17);
+    const byType = (t) => deck.filter((c) => c.type === t);
+    expect(byType('note')).toHaveLength(9);
+    expect(byType('rest')).toHaveLength(6);
+    expect(byType('clef')).toHaveLength(2);
     expect(new Set(deck.map((c) => c.id)).size).toBe(deck.length);
   });
 
-  it('carries a VexFlow duration code per card (incl. the breve)', () => {
+  it('keeps the original plain-note ids stable (srt:phase0 progress survives)', () => {
+    const ids = buildBasicsDeck().map((c) => c.id);
+    for (const v of DURATION_VALUES) expect(ids).toContain(`dur:${v}`);
+  });
+
+  it('models plain notes with their duration value as the grading key', () => {
+    const whole = buildBasicsDeck().find((c) => c.id === 'dur:whole');
+    expect(whole).toMatchObject({ type: 'note', key: 'whole', vex: 'w', dotted: false });
+    const breve = buildBasicsDeck().find((c) => c.id === 'dur:breve');
+    expect(breve).toMatchObject({ type: 'note', key: 'breve', vex: '1/2' });
+  });
+
+  it('adds the common dotted notes (half, quarter, eighth) with a dotted key', () => {
+    const dotted = buildBasicsDeck().filter((c) => c.type === 'note' && c.dotted);
+    expect(dotted.map((c) => c.id)).toEqual([
+      'dur:half:dot',
+      'dur:quarter:dot',
+      'dur:eighth:dot',
+    ]);
+    // Dotted cards carry the *base* vex code plus the dotted flag (the dot is a
+    // render-time modifier, not a different duration).
+    expect(buildBasicsDeck().find((c) => c.id === 'dur:half:dot')).toMatchObject({
+      key: 'half.',
+      vex: 'h',
+      dotted: true,
+    });
+  });
+
+  it('models rest cards keyed by duration value, sharing the note vex codes', () => {
     const deck = buildBasicsDeck();
-    expect(deck.every((c) => typeof c.vex === 'string' && c.vex.length > 0)).toBe(true);
-    expect(deck.find((c) => c.value === 'breve').vex).toBe('1/2');
-    expect(deck.find((c) => c.value === 'quarter').vex).toBe('q');
+    expect(deck.find((c) => c.id === 'rest:quarter')).toMatchObject({
+      type: 'rest',
+      key: 'quarter',
+      vex: 'q',
+    });
+    expect(deck.filter((c) => c.type === 'rest').map((c) => c.key)).toEqual(DURATION_VALUES);
+  });
+
+  it('models the two clef cards', () => {
+    const deck = buildBasicsDeck();
+    expect(deck.find((c) => c.id === 'clef:treble')).toMatchObject({
+      type: 'clef',
+      key: 'treble',
+      clef: 'treble',
+    });
+    expect(deck.find((c) => c.id === 'clef:bass')).toMatchObject({ type: 'clef', clef: 'bass' });
   });
 
   it('is clef- and range-independent (takes no settings)', () => {
-    // Same six cards no matter what; pitch/clef are out of scope for Basics.
-    expect(buildBasicsDeck().map((c) => c.id)).toEqual(
-      buildBasicsDeck().map((c) => c.id)
+    // Same cards no matter what; pitch/clef/range are out of scope for Basics.
+    expect(buildBasicsDeck().map((c) => c.id)).toEqual(buildBasicsDeck().map((c) => c.id));
+  });
+});
+
+describe('Basics option pools', () => {
+  it('note pool is the 6 plain + 3 dotted keys', () => {
+    expect(NOTE_KEYS).toHaveLength(9);
+    expect(NOTE_KEYS).toEqual(
+      expect.arrayContaining([...DURATION_VALUES, 'half.', 'quarter.', 'eighth.'])
     );
+  });
+
+  it('rest pool is the 6 duration values; clef pool is the 2 clefs', () => {
+    expect(REST_VALUES).toHaveLength(6);
+    expect(CLEF_VALUES).toEqual(['treble', 'bass']);
+  });
+
+  it('optionPoolFor picks the pool by card type', () => {
+    expect(optionPoolFor('note')).toBe(NOTE_KEYS);
+    expect(optionPoolFor('rest')).toBe(REST_VALUES);
+    expect(optionPoolFor('clef')).toBe(CLEF_VALUES);
+  });
+
+  it('a clef question clamps to its two options', () => {
+    const opts = choices('treble', CLEF_VALUES);
+    expect(opts).toHaveLength(2);
+    expect(new Set(opts)).toEqual(new Set(['treble', 'bass']));
+  });
+});
+
+describe('Basics labels — notes, rests, clefs', () => {
+  it('noteLabel names plain and dotted notes', () => {
+    expect(noteLabel('half')).toBe('Minim');
+    expect(noteLabel('half', 'american')).toBe('Half note');
+    expect(noteLabel('half.')).toBe('Dotted minim');
+    expect(noteLabel('quarter.', 'american')).toBe('Dotted quarter note');
+  });
+
+  it('restLabel uses natural rest names in both conventions', () => {
+    expect(restLabel('quarter')).toBe('Crotchet rest');
+    expect(restLabel('whole')).toBe('Semibreve rest');
+    expect(restLabel('quarter', 'american')).toBe('Quarter rest');
+    expect(restLabel('whole', 'american')).toBe('Whole rest');
+    expect(restLabel('breve', 'american')).toBe('Double whole rest'); // " note" stripped
+  });
+
+  it('clefLabel names the clef', () => {
+    expect(clefLabel('treble')).toBe('Treble clef');
+    expect(clefLabel('bass')).toBe('Bass clef');
+  });
+
+  it('basicsLabel dispatches on type and appends beats to notes/rests, not clefs', () => {
+    expect(basicsLabel('note', 'quarter')).toBe('Crotchet · 1 beat');
+    expect(basicsLabel('note', 'half.', 'american')).toBe('Dotted half note · 3 beats');
+    expect(basicsLabel('rest', 'quarter', 'american')).toBe('Quarter rest · 1 beat');
+    expect(basicsLabel('rest', 'eighth')).toBe('Quaver rest · ½ beat');
+    expect(basicsLabel('clef', 'bass')).toBe('Bass clef'); // clefs have no beat value
+  });
+});
+
+describe('beats — note/rest length', () => {
+  it('beatsForKey: quarter = 1 beat, scaling by value, dotted ×1.5', () => {
+    expect(beatsForKey('quarter')).toBe(1);
+    expect(beatsForKey('whole')).toBe(4);
+    expect(beatsForKey('breve')).toBe(8);
+    expect(beatsForKey('eighth')).toBe(0.5);
+    expect(beatsForKey('half.')).toBe(3);
+    expect(beatsForKey('quarter.')).toBe(1.5);
+    expect(beatsForKey('eighth.')).toBe(0.75);
+  });
+
+  it('beatsLabel formats whole + fractional beats with pluralization', () => {
+    expect(beatsLabel(1)).toBe('1 beat');
+    expect(beatsLabel(2)).toBe('2 beats');
+    expect(beatsLabel(8)).toBe('8 beats');
+    expect(beatsLabel(0.5)).toBe('½ beat');
+    expect(beatsLabel(0.25)).toBe('¼ beat');
+    expect(beatsLabel(0.75)).toBe('¾ beat');
+    expect(beatsLabel(1.5)).toBe('1½ beats');
   });
 });
 

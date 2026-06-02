@@ -55,10 +55,13 @@ to Phase 1, not here.
   on a *clef-less* staff at a fixed position; user picks the duration name. The
   note's pitch is never shown or named (that is Phase 1). Coverage: sixteenth →
   double whole (6 values).
-- **Rest time-value cards** — render a rest glyph; user picks its duration name.
-  Same 6 values.
-- **Clef-symbol cards** — render a lone clef; user identifies treble vs bass.
-  (The only Basics cards that show a clef in isolation.)
+- **Rest time-value cards** ✅ (M2d) — render a rest glyph; user picks its
+  duration name. Same 6 values.
+- **Clef-symbol cards** ✅ (M2d) — render a lone clef; user identifies treble vs
+  bass. (The only Basics cards that show a clef in isolation.)
+- **Dotted notes** ✅ (M2d) — the common three (dotted half/quarter/eighth); a
+  note card's options mix dotted + plain. Every note/rest option also shows its
+  length in beats, so the symbol is tied to its duration.
 - All answers are **multiple choice**.
 - **Naming-convention setting** — British or American duration names, **default
   British** (see the table in Design Notes). Affects duration + rest cards only.
@@ -67,7 +70,7 @@ to Phase 1, not here.
 
 **Out of scope (Phase 0)**
 - Pitch reading / note naming, accidentals, tied durations, time signatures, and
-  recall/typed input (all Phase 1 or later). Dotted notes are planned for M2d.
+  recall/typed input (all Phase 1 or later).
 
 ### Phase 1 — Single notes, treble & bass clef ✅ shipped
 Single-note reading on both clefs, naturals + accidentals, Letters/Piano answer
@@ -214,14 +217,7 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2c — Basics phase scaffold + note time-value cards** ✅ shipped — see HISTORY.md.
 
-**M2d — Basics phase: rests, clef cards & dotted notes** *(Phase 0, part 2)*
-- Rest time-value cards (sixteenth → double whole), VexFlow rendering of rest
-  glyphs; option labels honour British/American. (Note time-value cards shipped
-  in M2c.)
-- Clef-symbol cards (lone treble/bass clef).
-- Dotted notes — modifying a note's length by adding a dot (e.g. a dotted
-  half = 3 beats). Detailed scope, UX, and implementation to be planned when
-  this milestone is picked up.
+**M2d — Basics phase: rests, clef cards & dotted notes** ✅ shipped — see HISTORY.md.
 
 **M2e — Progress view**
 - New `Progress` view + route, completion bar per phase read from each

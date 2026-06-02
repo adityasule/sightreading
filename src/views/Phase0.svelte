@@ -1,8 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { settings } from '../lib/settings.svelte.js';
-  import { buildBasicsDeck, choices, durationLabel, DURATION_VALUES } from '../lib/music.js';
-  import { drawDurationNote } from '../lib/render.js';
+  import { buildBasicsDeck, choices, basicsLabel, optionPoolFor } from '../lib/music.js';
+  import { drawDurationNote, drawRest, drawClef } from '../lib/render.js';
   import Choices from '../lib/Choices.svelte';
   import QuizSettings from '../lib/QuizSettings.svelte';
   import * as srs from '../lib/spaced-repetition.js';
@@ -17,9 +17,9 @@
   // SRS state is a plain blob (persisted to localStorage), not reactive.
   let srsState = srs.loadState(STORAGE_KEY);
 
-  // Six duration cards, clef-/range-independent — so unlike Phase 1 the deck is
-  // static (no $derived on settings). The British/American setting changes the
-  // option labels, not the deck.
+  // The Basics deck — note (plain + dotted), rest, and clef cards. Clef-/range-
+  // independent, so unlike Phase 1 the deck is static (no $derived on settings).
+  // The British/American setting changes the option labels, not the deck.
   const deck = buildBasicsDeck();
 
   let current = $state(null); // active card, or null when caught up
@@ -39,17 +39,30 @@
   let shown = 0;
 
   let isCorrect = $derived(
-    mode === 'feedback' && current != null && picked === current.value
+    mode === 'feedback' && current != null && picked === current.key
   );
-  // The card's duration name under the current naming convention.
+  // The card's answer label under the current naming convention.
   let answerLabel = $derived(
-    current ? durationLabel(current.value, settings.durationNames) : ''
+    current ? basicsLabel(current.type, current.key, settings.durationNames) : ''
   );
   // Option {value,label} pairs — derived, not frozen, so the quick-settings
   // British/American toggle relabels the current card live (the value set and
-  // its shuffled order stay fixed).
+  // its shuffled order stay fixed). Clef labels ignore the convention.
   let options = $derived(
-    optionValues.map((v) => ({ value: v, label: durationLabel(v, settings.durationNames) }))
+    current
+      ? optionValues.map((v) => ({
+          value: v,
+          label: basicsLabel(current.type, v, settings.durationNames),
+        }))
+      : []
+  );
+  // The question prompt, per card type.
+  let prompt = $derived(
+    current?.type === 'rest'
+      ? 'What kind of rest is this?'
+      : current?.type === 'clef'
+        ? 'Which clef is this?'
+        : 'What kind of note is this?'
   );
 
   function refreshCounts() {
@@ -61,7 +74,7 @@
     current = card;
     source = src;
     picked = null;
-    optionValues = choices(card.value, DURATION_VALUES); // its value + 3 distractors
+    optionValues = choices(card.key, optionPoolFor(card.type)); // its key + distractors
     mode = 'answering';
     shown += 1;
     renderNote();
@@ -119,7 +132,7 @@
   function answer(value) {
     if (mode !== 'answering' || !current) return;
     picked = value;
-    const correct = value === current.value;
+    const correct = value === current.key;
 
     if (source === 'relearn') {
       // Pure reinforcement: the miss is already on the schedule, so don't touch
@@ -170,7 +183,13 @@
     if (!vex || !staffEl || !current) return;
     const color =
       mode === 'feedback' && picked != null ? (isCorrect ? '#16a34a' : '#dc2626') : null;
-    drawDurationNote(vex, staffEl, { duration: current.vex, color });
+    if (current.type === 'rest') {
+      drawRest(vex, staffEl, { duration: current.vex, color });
+    } else if (current.type === 'clef') {
+      drawClef(vex, staffEl, { clef: current.clef }); // no glyph tint — see render.js
+    } else {
+      drawDurationNote(vex, staffEl, { duration: current.vex, dotted: current.dotted, color });
+    }
   }
 
   onMount(async () => {
@@ -181,6 +200,7 @@
       Renderer: m.Renderer,
       Stave: m.Stave,
       StaveNote: m.StaveNote,
+      Dot: m.Dot,
       Formatter: m.Formatter,
       Voice: m.Voice,
     };
@@ -210,7 +230,7 @@
 
   <header class="head">
     <h2>Basics</h2>
-    <p class="muted">Identify each note by its time value.</p>
+    <p class="muted">Identify each symbol — note and rest values, and clefs.</p>
   </header>
 
   <div class="stats" aria-live="polite">
@@ -243,20 +263,20 @@
         {:else}
           <p class="bad">
             That was the <strong>{answerLabel}</strong>
-            {#if picked}(you picked {durationLabel(picked, settings.durationNames)}){/if}.
+            {#if picked}(you picked {basicsLabel(current.type, picked, settings.durationNames)}){/if}.
           </p>
           <button type="button" class="btn-primary" onclick={next}>Next</button>
         {/if}
       {:else if source === 'relearn'}
         <p class="prompt-hint relearn">↻ One you just missed — try again.</p>
       {:else}
-        <p class="prompt-hint muted">What kind of note is this?</p>
+        <p class="prompt-hint muted">{prompt}</p>
       {/if}
     </div>
 
     <Choices
       {options}
-      correct={current?.value ?? null}
+      correct={current?.key ?? null}
       {picked}
       revealed={mode === 'feedback'}
       disabled={mode !== 'answering'}

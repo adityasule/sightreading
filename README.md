@@ -11,7 +11,15 @@ npm run dev      # http://localhost:5173 (also exposed on your LAN)
 npm run build    # outputs ./dist
 npm run preview  # serve ./dist locally on :4173 (also exposed on your LAN)
 npm test         # run the unit tests once
+npm run render   # (dev-only) render staff glyphs to ./render-out/*.svg
 ```
+
+`npm run render` is a dev tool for fast iteration on the music rendering: it
+draws the project's staff glyphs (Basics note/rest/clef cards and Phase 1 notes)
+to self-contained SVGs through the same `src/lib/render.js` the app uses, so the
+output can't drift from what ships. `-- note|rest|clef|phase1` narrows by kind;
+a second arg filters by key/value/id; `-- --feedback` tints. The browser is
+still the source of truth — this just shortens the loop.
 
 ## Tests
 

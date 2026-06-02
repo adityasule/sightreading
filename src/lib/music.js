@@ -288,12 +288,14 @@ export function pcName(pc) {
 // ── Phase 0 (Basics) ─────────────────────────────────────────────────────────
 //
 // The gentle, multiple-choice on-ramp before Phase 1's pitch reading. Basics is
-// symbol recognition, not note naming: the user identifies a note's *time value*
-// (its duration) — and, from M2d, rests and clef symbols. Pitch is deliberately
-// out of scope here (reading note names is Phase 1 / Notation), so duration
-// cards render on a *clef-less* staff at a fixed position and the note is never
-// named. Phase 0 persists under its own blob (srt:phase0) and reuses the generic
-// scheduler + the multiple-choice answer pad.
+// symbol recognition, not note naming: the user identifies a *time value* — a
+// note's duration (plain or dotted) or a rest's — or a clef symbol. Pitch is
+// deliberately out of scope here (reading note names is Phase 1 / Notation), so
+// note/rest cards render on a *clef-less* staff at a fixed position and the note
+// is never named; clef cards are the only ones that show a clef in isolation.
+// Each card carries a `type` ('note' | 'rest' | 'clef') so the renderer and the
+// option set branch on it. Phase 0 persists under its own blob (srt:phase0) and
+// reuses the generic scheduler + the multiple-choice answer pad.
 
 /** In-place Fisher–Yates shuffle; returns the same array for chaining. */
 function shuffle(arr) {
@@ -317,23 +319,49 @@ export function choices(correct, pool, count = 4) {
 }
 
 // The six note durations, sixteenth → double whole (GOALS Phase 0 scope). Each
-// becomes one card; `value` is the stable, naming-independent grading key (and
-// id suffix), `vex` the VexFlow duration code, and british/american the display
-// labels picked by the Settings naming convention. Ordered longest-common-first
-// (the order new cards are introduced); the rare breve comes last.
+// seeds a note card and a rest card; `value` is the stable, naming-independent
+// grading key (and id suffix), `vex` the VexFlow duration code, and british/
+// american the display labels picked by the Settings naming convention. Ordered
+// longest-common-first (the order new cards are introduced); the rare breve
+// comes last.
 const DURATIONS = [
-  { value: 'whole', vex: 'w', british: 'Semibreve', american: 'Whole note' },
-  { value: 'half', vex: 'h', british: 'Minim', american: 'Half note' },
-  { value: 'quarter', vex: 'q', british: 'Crotchet', american: 'Quarter note' },
-  { value: 'eighth', vex: '8', british: 'Quaver', american: 'Eighth note' },
-  { value: 'sixteenth', vex: '16', british: 'Semiquaver', american: 'Sixteenth note' },
-  { value: 'breve', vex: '1/2', british: 'Breve', american: 'Double whole note' },
+  { value: 'whole', vex: 'w', beats: 4, british: 'Semibreve', american: 'Whole note' },
+  { value: 'half', vex: 'h', beats: 2, british: 'Minim', american: 'Half note' },
+  { value: 'quarter', vex: 'q', beats: 1, british: 'Crotchet', american: 'Quarter note' },
+  { value: 'eighth', vex: '8', beats: 0.5, british: 'Quaver', american: 'Eighth note' },
+  { value: 'sixteenth', vex: '16', beats: 0.25, british: 'Semiquaver', american: 'Sixteenth note' },
+  { value: 'breve', vex: '1/2', beats: 8, british: 'Breve', american: 'Double whole note' },
 ];
 
 const DURATION_BY_VALUE = Object.fromEntries(DURATIONS.map((d) => [d.value, d]));
 
 /** The duration grading keys, in teaching order — also the `choices` pool. */
 export const DURATION_VALUES = DURATIONS.map((d) => d.value);
+
+// The durations that also get a dotted variant (a dot adds half the note's
+// length). The common three a beginner meets first — dotted breve/whole/
+// sixteenth are rare and left out (GOALS M2d). Dotted rests are out of scope.
+const DOTTED_VALUES = ['half', 'quarter', 'eighth'];
+
+// A dotted note's grading key is the base value with a trailing dot ('half.'),
+// keeping it distinct from the plain note in the same option pool.
+const dottedKey = (value) => `${value}.`;
+
+/** Note-card option pool: the 6 plain durations plus the 3 dotted variants. */
+export const NOTE_KEYS = [...DURATION_VALUES, ...DOTTED_VALUES.map(dottedKey)];
+
+/** Rest-card option pool — the same six duration values, labelled as rests. */
+export const REST_VALUES = DURATION_VALUES;
+
+/** Clef-card option pool — the two clefs the user distinguishes. */
+export const CLEF_VALUES = ['treble', 'bass'];
+
+/** The `choices` pool for a Basics card type. */
+export function optionPoolFor(type) {
+  if (type === 'rest') return REST_VALUES;
+  if (type === 'clef') return CLEF_VALUES;
+  return NOTE_KEYS;
+}
 
 /**
  * Display label for a duration `value` under a naming convention. Defaults to
@@ -345,16 +373,85 @@ export function durationLabel(value, convention = 'british') {
 }
 
 /**
- * Build the Phase 0 deck: one note time-value card per duration, in teaching
- * order. Clef- and range-independent (pitch is out of scope here), so unlike
- * the Phase 1 deck it takes no settings — the answer *labels*, not the cards,
- * follow the British/American naming convention.
+ * Label for a note-card key: a plain duration ('half' → "Minim" / "Half note")
+ * or a dotted one ('half.' → "Dotted minim" / "Dotted half note").
+ */
+export function noteLabel(key, convention = 'british') {
+  if (key.endsWith('.')) {
+    return `Dotted ${durationLabel(key.slice(0, -1), convention).toLowerCase()}`;
+  }
+  return durationLabel(key, convention);
+}
+
+/**
+ * Label for a rest card: the natural rest name in either convention — British
+ * "Crotchet rest", American "Quarter rest" (the American note labels end in
+ * " note", which is dropped before appending " rest"; British never do, so the
+ * strip is a no-op there). "Double whole note" → "Double whole rest".
+ */
+export function restLabel(value, convention = 'british') {
+  return `${durationLabel(value, convention).replace(/ note$/, '')} rest`;
+}
+
+/** Label for a clef card, e.g. 'treble' → "Treble clef". */
+export function clefLabel(clef) {
+  return `${clef[0].toUpperCase()}${clef.slice(1)} clef`;
+}
+
+/**
+ * Length in beats of a note/rest `key`, with the quarter note as the reference
+ * (1 beat) — the de-facto teaching default. A dot adds half the value, so the
+ * dotted keys ('half.') are ×1.5. Rests share their note's length.
+ */
+export function beatsForKey(key) {
+  if (key.endsWith('.')) return DURATION_BY_VALUE[key.slice(0, -1)].beats * 1.5;
+  return DURATION_BY_VALUE[key].beats;
+}
+
+// Tidy vulgar fractions for the sub-beat lengths, so labels read "½ beat" not
+// "0.5 beats".
+const FRACTIONS = { 0.25: '¼', 0.5: '½', 0.75: '¾' };
+
+/** Human beat-count label, e.g. 1 → "1 beat", 1.5 → "1½ beats", 0.5 → "½ beat". */
+export function beatsLabel(beats) {
+  const whole = Math.floor(beats);
+  const frac = FRACTIONS[beats - whole] ?? '';
+  const num = whole > 0 ? `${whole}${frac}` : frac || '0';
+  return `${num} ${beats > 1 ? 'beats' : 'beat'}`;
+}
+
+/**
+ * Display label for a Basics card's option `key`, dispatched on `type`. Note and
+ * rest options carry their length in beats alongside the name (e.g. "Crotchet ·
+ * 1 beat") so the student associates the symbol with its duration; clefs have no
+ * beat value.
+ */
+export function basicsLabel(type, key, convention = 'british') {
+  if (type === 'clef') return clefLabel(key);
+  const name = type === 'rest' ? restLabel(key, convention) : noteLabel(key, convention);
+  return `${name} · ${beatsLabel(beatsForKey(key))}`;
+}
+
+/**
+ * Build the Phase 0 deck: note cards (6 plain + 3 dotted), rest cards (6), and
+ * clef cards (2), in teaching order. Clef- and range-independent (pitch is out
+ * of scope here), so unlike the Phase 1 deck it takes no settings — the answer
+ * *labels*, not the cards, follow the British/American naming convention. Each
+ * card's `key` is its grading value; render data is `vex` (+ `dotted`) for
+ * note/rest glyphs and `clef` for clef cards.
  */
 export function buildBasicsDeck() {
-  return DURATIONS.map((d) => ({
-    type: 'duration',
-    id: `dur:${d.value}`,
-    value: d.value,
-    vex: d.vex,
+  const notes = DURATIONS.map((d) => ({
+    type: 'note', id: `dur:${d.value}`, key: d.value, vex: d.vex, dotted: false,
   }));
+  const dotted = DOTTED_VALUES.map((v) => ({
+    type: 'note', id: `dur:${v}:dot`, key: dottedKey(v), vex: DURATION_BY_VALUE[v].vex, dotted: true,
+  }));
+  const rests = DURATIONS.map((d) => ({
+    type: 'rest', id: `rest:${d.value}`, key: d.value, vex: d.vex,
+  }));
+  const clefs = CLEF_VALUES.map((clef) => ({
+    type: 'clef', id: `clef:${clef}`, key: clef, clef,
+  }));
+  return [...notes, ...dotted, ...rests, ...clefs];
 }

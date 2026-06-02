@@ -7,7 +7,7 @@ export const PHASES = [
   {
     id: 'phase0',
     name: 'Basics',
-    blurb: 'Identify note durations — multiple choice.',
+    blurb: 'Read note values, rests & clefs — multiple choice.',
     ready: true,
   },
   {

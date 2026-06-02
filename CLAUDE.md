@@ -16,7 +16,7 @@ npm run dev      # vite dev server on :5173 (also on LAN — see README for phon
 npm run build    # production build → ./dist
 npm run preview  # serve ./dist on :4173
 npm test         # run the Vitest unit tests once (npm run test:watch to watch)
-npm run render:basics  # render Basics note-value cards to ./render-out/*.svg (dev-only)
+npm run render   # render staff glyphs (Basics + Phase 1) to ./render-out/*.svg (dev-only)
 ```
 **Vitest** (dev-only, never shipped) covers the pure-logic modules — `music.js`,
 `spaced-repetition.js`, `progression.js` — via colocated `src/lib/*.test.js`
@@ -24,12 +24,14 @@ files. Run `npm test` after touching those. There is **no linter** configured,
 and the Svelte/UI components have no tests: "verify" the UI by running the app
 (`npm run dev`) and exercising the change in the browser.
 
-**`render:basics`** (dev-only, never shipped) draws the Phase 0 staff to
+**`render`** (dev-only, never shipped) draws the project's staff glyphs to
 self-contained SVGs via Node + jsdom, going through the same `src/lib/render.js`
 the app uses (so output can't drift) and embedding the Bravura font so each SVG
 opens anywhere. It's for *fast iteration* on the rendering — the browser is
-still the source of truth for correctness. `npm run render:basics -- <value>`
-for one duration; `-- --feedback` to tint it. Output dir is git-ignored.
+still the source of truth for correctness. `npm run render` emits all Basics
+cards (notes/rests/clefs); `-- note|rest|clef|phase1` narrows by kind, an
+optional second arg filters by key/value/id (`-- rest quarter`, `-- phase1
+treble:60`), and `-- --feedback` tints. Output dir is git-ignored.
 
 ## Architecture
 Svelte 5 + Vite SPA. View-switching by simple state, no router.

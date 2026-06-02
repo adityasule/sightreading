@@ -161,6 +161,43 @@ cards** — Basics is symbol recognition, not pitch reading (reading note names
   single note of any duration format.
 - 67 unit tests (up from 59): duration deck + `durationLabel` + `choices`.
 
+### Milestone 2d — Basics phase: rests, clef cards & dotted notes ✅
+Completed Phase 0 (Basics): the symbol-recognition on-ramp now covers rests,
+clefs and dotted notes alongside M2c's plain note durations, with the staff
+rendering polished and the dev render script generalised beyond Phase 0.
+- **Card model (`music.js`)** — `buildBasicsDeck()` returns 17 cards, each tagged
+  with a `type` ('note' | 'rest' | 'clef') and a grading `key`: 6 plain notes + 3
+  dotted (half/quarter/eighth) + 6 rests (same 6 values) + 2 clefs. The original
+  `dur:*` ids are unchanged, so saved `srt:phase0` progress carries over and new
+  cards just drip in via the daily budget — no migration. Option pools
+  (`NOTE_KEYS`/`REST_VALUES`/`CLEF_VALUES`, `optionPoolFor`) and labels
+  (`noteLabel`/`restLabel`/`clefLabel`/`basicsLabel`) drive the per-type option
+  sets. American rests take the natural form ("Quarter rest", "Double whole
+  rest"); a note card's pool mixes dotted + plain so the dot is the thing tested.
+- **Length in beats** — every note/rest option shows its length alongside the
+  name ("Crotchet · 1 beat", "Dotted minim · 3 beats", "Quaver rest · ½ beat"):
+  quarter = 1 beat reference, a dot = ×1.5, sub-beats as vulgar fractions
+  (`beatsForKey`/`beatsLabel`). Clefs carry no beat value.
+- **Rendering (`render.js`)** — added `drawRest` and `drawClef`, extended
+  `drawDurationNote` with a dot (`Dot.buildAndAttach`), and the note/rest glyph is
+  now horizontally **centred** on the clef-less staff (it previously sat hard
+  left). Centering needs `note.setStave(stave)` before `getBoundingBox()`, which
+  otherwise throws "NoStave". Clefs draw at the staff start, as in real notation,
+  with no feedback tint — VexFlow 5 renders the clef as a `<text>` glyph the
+  context can't recolour, so clef cards convey correct/wrong via the answer pad.
+- **View (`Phase0.svelte`)** — branches render / grade / options / prompt on the
+  card's `type` ("What kind of note/rest is this?", "Which clef is this?");
+  reuses the `Choices` pad and in-session relearning unchanged.
+- **Shared renderer + generic dev script** — Phase 1's note rendering was
+  extracted into `render.js` as `drawNote` (Phase1.svelte calls it; first-render
+  font-race fix intact), and the M2c `render:basics` script was generalised and
+  renamed to `render`: it dispatches over card types (`-- note|rest|clef|phase1`,
+  optional key/value/id filter), still drawing through the same `render.js` so the
+  SVG output can't drift from the app. Gotcha recorded: VexFlow 5 draws glyphs as
+  `<text>`, not `<path>`, so check the output by counting `<text>`.
+- 81 unit tests (up from 67): the expanded deck, the three option pools, the
+  note/rest/clef labels, the beats helpers, and `choices` over the new pools.
+
 ---
 
 ## Resolved design notes

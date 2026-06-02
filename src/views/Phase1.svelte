@@ -9,6 +9,7 @@
     pcOf,
     pcName,
   } from '../lib/music.js';
+  import { drawNote } from '../lib/render.js';
   import Piano from '../lib/Piano.svelte';
   import QuizSettings from '../lib/QuizSettings.svelte';
   import * as srs from '../lib/spaced-repetition.js';
@@ -238,37 +239,15 @@
 
   function renderNote() {
     if (!vex || !staffEl || !current) return;
-    const { Renderer, Stave, StaveNote, Accidental, Formatter, Voice } = vex;
-    staffEl.innerHTML = '';
-    const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
-    // Reserve vertical room for the configured ledger lines so notes above or
-    // below the staff aren't clipped. Stable across cards (depends only on the
-    // setting), so the staff doesn't jump between notes.
-    const margin = 44 + (settings.ledgerLines ?? 2) * 12;
-    renderer.resize(320, margin * 2 + 44);
-    const ctx = renderer.getContext();
-
-    const stave = new Stave(10, margin, 300).addClef(current.clef);
-    stave.setContext(ctx).draw();
-
-    const note = new StaveNote({
+    const color =
+      mode === 'feedback' && picked != null ? (isCorrect ? '#16a34a' : '#dc2626') : null;
+    drawNote(vex, staffEl, {
       clef: current.clef,
-      keys: [current.vexKey],
-      duration: 'q',
+      vexKey: current.vexKey,
+      accidental: current.accidental,
+      ledgerLines: settings.ledgerLines ?? 2,
+      color,
     });
-    // The accidental in the key string sets the pitch but isn't drawn; the
-    // glyph must be added explicitly.
-    if (current.accidental) {
-      note.addModifier(new Accidental(current.accidental), 0);
-    }
-    if (mode === 'feedback' && picked != null) {
-      const color = isCorrect ? '#16a34a' : '#dc2626';
-      note.setStyle({ fillStyle: color, strokeStyle: color });
-    }
-
-    const voice = new Voice({ numBeats: 1, beatValue: 4 }).addTickables([note]);
-    new Formatter().joinVoices([voice]).format([voice], 220);
-    voice.draw(ctx, stave);
   }
 
   onMount(async () => {
