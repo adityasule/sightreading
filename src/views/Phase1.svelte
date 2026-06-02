@@ -38,6 +38,14 @@
   // Progression view (current level, per-level progress, gate). See progression.js.
   let level = $state(null);
 
+  // Manual deck top-up (M2e): once the user opts to bypass the daily new-card
+  // cap, new cards flow uncapped for the rest of the session (resets on remount).
+  let bypassCap = $state(false);
+  // Caught-up: does the current level still have un-introduced cards? True means a
+  // budget-limited dead-end (offer the cap bypass); false once the level pool is
+  // exhausted (offer the early next-level advance instead).
+  let poolHasNew = $derived(!!level && level.pool.some((c) => !srsState.cards[c.id]));
+
   let advanceTimer = null;
 
   // In-session relearning: a miss re-appears after RELEARN_GAP other cards,
@@ -104,9 +112,11 @@
     }
 
     // 2. The normal scheduler: a due card, or a fresh one from the current
-    //    level only (progression gates which notes are introducible).
+    //    level only (progression gates which notes are introducible). The cap
+    //    bypass lifts the daily new-card budget once the user opts in.
     const view = progress(srsState, deck);
-    const id = srs.pickNext(srsState, deck, settings.newCardsPerDay, view.pool);
+    const budget = bypassCap ? Infinity : settings.newCardsPerDay;
+    const id = srs.pickNext(srsState, deck, budget, view.pool);
     srs.saveState(STORAGE_KEY, srsState); // persist newly-introduced card / migration
     refreshCounts();
     if (id) return showCard(deck.find((c) => c.id === id), 'scheduled');
@@ -136,12 +146,30 @@
   }
 
   // Accept the progression gate: unlock the next level, then start serving its
-  // notes. Reached only when the current level is complete (box ≥ 2 on every
-  // card) and a next level exists.
+  // notes. Reached from the mastered gate (level complete) or the M2e early
+  // top-up (level fully introduced but not yet mastered) — `advance` + the
+  // introduction-frontier `current` move both the banner and the new-card pool.
   function startNextLevel() {
     advance(srsState, deck);
     srs.saveState(STORAGE_KEY, srsState);
     next();
+  }
+
+  // Manual cap bypass (M2e): opt out of the daily new-card limit for this
+  // session, then serve the next new card immediately.
+  function addMoreCards() {
+    bypassCap = true;
+    next();
+  }
+
+  // The caught-up screen's primary action, mirroring the on-screen button order:
+  // advance the level (mastered gate or early top-up), else add more new notes
+  // past the cap, else practice already-learned notes ahead of schedule.
+  function caughtUpPrimary() {
+    if (deck.length === 0) return;
+    if (level?.canAdvance || (level?.next && !poolHasNew)) startNextLevel();
+    else if (poolHasNew) addMoreCards();
+    else practice();
   }
 
   function enqueueRelearn(id) {
@@ -218,8 +246,7 @@
     if (mode === 'caughtup') {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        if (level?.canAdvance) startNextLevel();
-        else practice();
+        caughtUpPrimary();
       }
       return;
     }
@@ -327,6 +354,22 @@
           ✅ You've mastered <strong>{levelName(level.current)}</strong>.
         </p>
         <p class="muted">Ready for the next level?</p>
+        <button type="button" class="btn-primary" onclick={startNextLevel}>
+          Start {levelName(level.next)}
+        </button>
+        <button type="button" onclick={practice}>Keep practicing</button>
+      {:else if poolHasNew}
+        <p>🎉 You're caught up — that's today's new-note limit.</p>
+        <p class="muted">Want to keep learning?</p>
+        <button type="button" class="btn-primary" onclick={addMoreCards}>
+          Add more new notes
+        </button>
+        <button type="button" onclick={practice}>Keep practicing</button>
+      {:else if level?.next}
+        <p class="good">
+          ✅ You've started every note in <strong>{levelName(level.current)}</strong>.
+        </p>
+        <p class="muted">Master them with reviews, or jump ahead now.</p>
         <button type="button" class="btn-primary" onclick={startNextLevel}>
           Start {levelName(level.next)}
         </button>

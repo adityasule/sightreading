@@ -62,10 +62,18 @@ export function progress(state, deck) {
   const active = levels.filter((l) => l.index <= state.unlocked);
   const pool = active.length ? active : [levels[0]];
 
-  // The current level is the earliest unlocked one still unmastered; once they
-  // are all done it's the frontier (last unlocked), where the gate appears.
+  // The current level is the *introduction frontier*: the earliest unlocked level
+  // that still has un-introduced cards, else the frontier (last unlocked), where
+  // the gate appears. Basing this on introduction rather than mastery is what
+  // lets the M2e early top-up work — bumping `unlocked` past a fully-introduced
+  // but unmastered level moves both the banner (`current`) and the new-card pool
+  // to the next level without first mastering this one. In the *normal* flow the
+  // two are identical: `unlocked` only ever advances past a level once it's
+  // mastered (and a mastered level is fully introduced), so the earliest level
+  // with un-introduced cards is also the earliest unmastered one.
   const current =
-    pool.find((l) => !boxAtLeast(state, l.cards, MASTER_BOX)) ?? pool[pool.length - 1];
+    pool.find((l) => l.cards.some((c) => !(c.id in state.cards))) ??
+    pool[pool.length - 1];
 
   const total = current.cards.length;
   const mastered = masteredCount(state, current.cards, MASTER_BOX);

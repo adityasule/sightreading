@@ -30,6 +30,13 @@
   let session = $state({ seen: 0, correct: 0 });
   let counts = $state({ due: 0, learned: 0, total: 0, newRemaining: 0 });
 
+  // Manual deck top-up (M2e): once the user opts to bypass the daily new-card
+  // cap, new cards flow uncapped for the rest of the session (resets on remount).
+  // Basics has no levels, so the top-up is just this cap bypass; `deckHasNew` is
+  // true while the finite deck still holds un-introduced cards.
+  let bypassCap = $state(false);
+  let deckHasNew = $derived(counts.learned < counts.total);
+
   let advanceTimer = null;
 
   // In-session relearning, mirroring Phase 1: a miss re-appears after
@@ -98,8 +105,10 @@
     }
 
     // 2. The normal scheduler: a due card, else a fresh one (deck order, so the
-    //    common durations lead), capped by the daily new-card budget.
-    const id = srs.pickNext(srsState, deck, settings.newCardsPerDay);
+    //    common durations lead), capped by the daily new-card budget — unless the
+    //    user has opted to bypass the cap for this session.
+    const budget = bypassCap ? Infinity : settings.newCardsPerDay;
+    const id = srs.pickNext(srsState, deck, budget);
     srs.saveState(STORAGE_KEY, srsState); // persist a newly-introduced card
     refreshCounts();
     if (id) return showCard(deck.find((c) => c.id === id), 'scheduled');
@@ -122,6 +131,13 @@
     const introduced = deck.filter((c) => srsState.cards[c.id]);
     if (introduced.length === 0) return;
     showCard(introduced[Math.floor(Math.random() * introduced.length)], 'practice');
+  }
+
+  // Manual cap bypass (M2e): opt out of the daily new-card limit for this
+  // session, then serve the next new card immediately.
+  function addMoreCards() {
+    bypassCap = true;
+    next();
   }
 
   function enqueueRelearn(id) {
@@ -168,7 +184,8 @@
     if (mode === 'caughtup') {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        practice();
+        if (deckHasNew) addMoreCards();
+        else practice();
       }
       return;
     }
@@ -250,10 +267,19 @@
 
   {#if mode === 'caughtup'}
     <div class="feedback caught">
-      <p>🎉 You're caught up — nothing due right now.</p>
-      <button type="button" class="btn-primary" onclick={practice}>
-        Keep practicing
-      </button>
+      {#if deckHasNew}
+        <p>🎉 You're caught up — that's today's new-card limit.</p>
+        <p class="muted">Want to keep learning?</p>
+        <button type="button" class="btn-primary" onclick={addMoreCards}>
+          Add more new cards
+        </button>
+        <button type="button" onclick={practice}>Keep practicing</button>
+      {:else}
+        <p>🎉 You're caught up — nothing due right now.</p>
+        <button type="button" class="btn-primary" onclick={practice}>
+          Keep practicing
+        </button>
+      {/if}
     </div>
   {:else}
     <div class="feedback" aria-live="polite">

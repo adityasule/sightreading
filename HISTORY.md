@@ -198,6 +198,44 @@ rendering polished and the dev render script generalised beyond Phase 0.
 - 81 unit tests (up from 67): the expanded deck, the three option pools, the
   note/rest/clef labels, the beats helpers, and `choices` over the new pools.
 
+### Milestone 2e — Progress view & manual deck top-up ✅
+The last *feature* slice of Milestone 2: a cross-phase Progress view and an
+escape hatch for the two "no new cards left" dead-ends.
+- **Progress view (`Progress.svelte`, route `progress`)** — a completion bar per
+  phase, read straight from each `srt:phaseN` blob (no new persistence) and
+  derived against the live deck so Notation tracks the clef/range settings.
+  "Mastered" everywhere means box ≥ 2 (`MASTER_BOX`), the same bar the curriculum
+  uses for level completion. Basics shows one bar (symbols mastered / 17);
+  Notation shows two — scale-level progression (fully-mastered levels / total,
+  captioned with the current level) and note mastery (mastered / deck). Unbuilt
+  phases (Chords, Key Signatures) render a locked/empty bar driven by the `PHASES`
+  `ready` flag. Wired into `App.svelte`'s `views` between Key Signatures and
+  Settings (order: Home · Basics · Notation · Chords · Key Signatures · Progress ·
+  Settings).
+- **Manual deck top-up** — two opt-in buttons in the caught-up screen:
+  - *Daily-cap bypass (both phases).* A session-scoped `bypassCap` flag lifts the
+    per-day new-card budget passed to `pickNext` (→ `Infinity` once toggled), so a
+    user who hits the cap but still has un-introduced cards can keep learning. The
+    button only shows while the pool/deck still holds un-introduced cards
+    (`poolHasNew` in Notation, `deckHasNew = learned < total` in Basics); resets
+    on remount.
+  - *Early next-level (Notation only).* When the current level's notes are all
+    introduced but not yet mastered (so the normal mastery gate hasn't opened) and
+    a next level exists, a "Start [next level]" button advances early via the
+    existing `advance()` path. Basics has no levels and a finite deck, so it gets
+    only the cap bypass.
+- **Introduction-frontier `current` (`progression.js`)** — the enabler for the
+  early advance. `progress().current` now resolves to the earliest unlocked level
+  with *un-introduced* cards (else the frontier), not the earliest *unmastered*
+  one. In the normal flow the two coincide (`unlocked` only ever moves past a
+  level once it's mastered, and a mastered level is fully introduced), so all the
+  M2a tests are unchanged; but after an early advance, bumping `unlocked` past a
+  fully-introduced-but-unmastered level moves both the banner *and* the new-card
+  pool to the next level, while the old level's cards keep coming due as reviews.
+- 83 unit tests (up from 81): two `progression.test.js` cases — the dead-end
+  (current stays put, `canAdvance` false) and the early advance (current/pool move
+  to the next level once it's unlocked).
+
 ---
 
 ## Resolved design notes

@@ -82,6 +82,34 @@ describe('advance — accepting the gate', () => {
   });
 });
 
+describe('early advance — manual top-up (M2e)', () => {
+  // Introduce every card in `cards` without mastering it (box 1 < MASTER_BOX).
+  function introduceOnly(state, cards) {
+    for (const c of cards) state.cards[c.id] = { box: 1, dueAt: 0 };
+  }
+
+  it('keeps current on a fully-introduced but unmastered level until advanced', () => {
+    // The dead-end the top-up resolves: every level-0 card is seen but none
+    // mastered, so the gate never opens and new material is stuck.
+    const s = { cards: {}, unlocked: 0 };
+    introduceOnly(s, LEVELS[0].cards);
+    const p = progress(s, DECK);
+    expect(p.current.index).toBe(0);
+    expect(p.canAdvance).toBe(false);
+    expect(p.next.index).toBe(LEVELS[1].index);
+  });
+
+  it('moves current and pool to the next level once it is unlocked early', () => {
+    // Simulate the top-up: level 0 introduced-but-unmastered, `unlocked` bumped
+    // to the next level (what `advance()` does on the early-advance button).
+    const s = { cards: {}, unlocked: LEVELS[1].index };
+    introduceOnly(s, LEVELS[0].cards);
+    const p = progress(s, DECK);
+    expect(p.current.index).toBe(LEVELS[1].index);
+    expect(p.pool).toEqual(LEVELS[1].cards);
+  });
+});
+
 describe('seedUnlocked — pre-M1d migration', () => {
   it('places a partly-trained user at their first unmastered level', () => {
     // Pre-M1d blob: cards trained in MIDI order, no `unlocked` pointer.

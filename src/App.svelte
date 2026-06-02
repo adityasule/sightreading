@@ -4,6 +4,7 @@
   import Phase1 from './views/Phase1.svelte';
   import Phase2 from './views/Phase2.svelte';
   import Phase3 from './views/Phase3.svelte';
+  import Progress from './views/Progress.svelte';
   import Settings from './views/Settings.svelte';
   import ThemeButton from './lib/ThemeButton.svelte';
   import { nav, go } from './lib/nav.svelte.js';
@@ -15,6 +16,7 @@
   const views = [
     { id: 'home', label: 'Home', component: Home },
     ...PHASES.map((p) => ({ id: p.id, label: p.name, component: components[p.id] })),
+    { id: 'progress', label: 'Progress', component: Progress },
     { id: 'settings', label: 'Settings', component: Settings },
   ];
 
