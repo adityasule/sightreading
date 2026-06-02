@@ -3,6 +3,7 @@
   import { settings } from '../lib/settings.svelte.js';
   import { buildDeck } from '../lib/music.js';
   import * as srs from '../lib/spaced-repetition.js';
+  import { progress } from '../lib/progression.js';
   import { PHASES } from '../lib/phases.js';
 
   // Notation "Today" snapshot. Loaded once on mount (Home remounts on every
@@ -11,16 +12,20 @@
   const deck = $derived(buildDeck(settings));
   const today = $derived(srs.summary(srsState, deck, settings.newCardsPerDay));
   const trend = srs.stats(srsState); // streak + lifetime accuracy
+  const level = $derived(progress(srsState, deck)); // current scale level + gate
 
-  // The primary action adapts to what's waiting.
+  // The primary action adapts to what's waiting: reviews first, then the
+  // progression gate, then new notes, then ahead-of-schedule practice.
   const cta = $derived(
     today.total === 0
       ? { label: 'Open Settings', to: 'settings' }
       : today.due > 0
         ? { label: `Review ${today.due} due`, to: 'phase1' }
-        : today.newRemaining > 0 && today.learned < today.total
-          ? { label: 'Learn new notes', to: 'phase1' }
-          : { label: 'Practice notes', to: 'phase1' }
+        : level.canAdvance
+          ? { label: `Start ${level.next.label}`, to: 'phase1' }
+          : today.newRemaining > 0 && today.learned < today.total
+            ? { label: 'Learn new notes', to: 'phase1' }
+            : { label: 'Practice notes', to: 'phase1' }
   );
 
 </script>
@@ -44,6 +49,14 @@
         No notes in the deck. Enable a clef under Settings to get started.
       </p>
     {:else}
+      {#if level.current}
+        <p class="level-line">
+          <strong>{level.current.label}</strong>
+          <span class="level-tag">{level.current.sub ?? level.current.keySig}</span>
+          <span class="level-prog">{level.mastered}/{level.total} mastered</span>
+        </p>
+      {/if}
+
       <div class="today-stats">
         <span><strong>{today.due}</strong> due</span>
         <span><strong>{today.newRemaining}</strong> new left</span>
@@ -122,6 +135,27 @@
   }
   .today-stats .streak strong {
     color: var(--accent);
+  }
+
+  /* Current scale level the user is working through. */
+  .level-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin: 0;
+  }
+  .level-line .level-tag {
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-weak);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .level-line .level-prog {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
   .today .empty {
     margin: 0;

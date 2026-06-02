@@ -12,6 +12,7 @@
   import Piano from '../lib/Piano.svelte';
   import QuizSettings from '../lib/QuizSettings.svelte';
   import * as srs from '../lib/spaced-repetition.js';
+  import { progress, advance } from '../lib/progression.js';
 
   const STORAGE_KEY = 'srt:phase1';
   const ADVANCE_MS = 750; // auto-advance delay after a correct answer
@@ -33,6 +34,8 @@
   let pendingAcc = $state(''); // '' | '#' | 'b' — staged modifier in Letters mode
   let session = $state({ seen: 0, correct: 0 });
   let counts = $state({ due: 0, learned: 0, total: 0, newRemaining: 0 });
+  // Progression view (current level, per-level progress, gate). See progression.js.
+  let level = $state(null);
 
   let advanceTimer = null;
 
@@ -53,8 +56,14 @@
 
   let isCorrect = $derived(mode === 'feedback' && gradeCorrect(current, picked));
 
+  // Full level name including the register sub-label. Matters at the C-major
+  // foundation split, where two levels share the "C major / A minor" label and
+  // differ only by register — without the sub the gate reads as a no-op.
+  const levelName = (lvl) => (lvl.sub ? `${lvl.label} — ${lvl.sub}` : lvl.label);
+
   function refreshCounts() {
     counts = srs.summary(srsState, deck, settings.newCardsPerDay);
+    level = progress(srsState, deck);
   }
 
   // Show a card and tag where it came from (drives how its answer is scored).
@@ -93,9 +102,11 @@
       i = relearn.findIndex((r) => r.showAfter <= shown);
     }
 
-    // 2. The normal scheduler: a due card, or a fresh one within budget.
-    const id = srs.pickNext(srsState, deck, settings.newCardsPerDay);
-    srs.saveState(STORAGE_KEY, srsState); // persist any newly-introduced card
+    // 2. The normal scheduler: a due card, or a fresh one from the current
+    //    level only (progression gates which notes are introducible).
+    const view = progress(srsState, deck);
+    const id = srs.pickNext(srsState, deck, settings.newCardsPerDay, view.pool);
+    srs.saveState(STORAGE_KEY, srsState); // persist newly-introduced card / migration
     refreshCounts();
     if (id) return showCard(deck.find((c) => c.id === id), 'scheduled');
 
@@ -112,13 +123,24 @@
   }
 
   // "Keep practicing" once caught up: drill a random card ahead of schedule.
-  // Answers still feed the scheduler, so this never hurts.
+  // Answers still feed the scheduler, so this never hurts. Only draws from
+  // notes already introduced — never jumps ahead to locked levels.
   function practice() {
     clearTimeout(advanceTimer);
     picked = null;
     pendingAcc = '';
-    if (deck.length === 0) return;
-    showCard(deck[Math.floor(Math.random() * deck.length)], 'practice');
+    const introduced = deck.filter((c) => srsState.cards[c.id]);
+    if (introduced.length === 0) return;
+    showCard(introduced[Math.floor(Math.random() * introduced.length)], 'practice');
+  }
+
+  // Accept the progression gate: unlock the next level, then start serving its
+  // notes. Reached only when the current level is complete (box ≥ 2 on every
+  // card) and a next level exists.
+  function startNextLevel() {
+    advance(srsState, deck);
+    srs.saveState(STORAGE_KEY, srsState);
+    next();
   }
 
   function enqueueRelearn(id) {
@@ -195,7 +217,8 @@
     if (mode === 'caughtup') {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        practice();
+        if (level?.canAdvance) startNextLevel();
+        else practice();
       }
       return;
     }
@@ -293,6 +316,14 @@
     <p class="muted">Name the note on the staff.</p>
   </header>
 
+  {#if level?.current}
+    <div class="level" aria-live="polite">
+      <span class="level-name">{level.current.label}</span>
+      <span class="level-tag">{level.current.sub ?? level.current.keySig}</span>
+      <span class="level-prog"><strong>{level.mastered}</strong>/{level.total} mastered</span>
+    </div>
+  {/if}
+
   <div class="stats" aria-live="polite">
     <span><strong>{counts.due}</strong> due</span>
     <span><strong>{counts.newRemaining}</strong> new left</span>
@@ -312,6 +343,15 @@
     <div class="feedback caught">
       {#if deck.length === 0}
         <p>No clefs enabled. Turn on treble or bass in <strong>Settings</strong>.</p>
+      {:else if level?.canAdvance}
+        <p class="good">
+          ✅ You've mastered <strong>{levelName(level.current)}</strong>.
+        </p>
+        <p class="muted">Ready for the next level?</p>
+        <button type="button" class="btn-primary" onclick={startNextLevel}>
+          Start {levelName(level.next)}
+        </button>
+        <button type="button" onclick={practice}>Keep practicing</button>
       {:else}
         <p>🎉 You're caught up — nothing due right now.</p>
         <button type="button" class="btn-primary" onclick={practice}>
@@ -432,6 +472,34 @@
   }
   .stats .acc strong {
     color: var(--accent);
+  }
+
+  /* Current level banner — the scale the user is working through. */
+  .level {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px 10px;
+    text-align: center;
+  }
+  .level-name {
+    font-weight: 600;
+  }
+  .level-tag {
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: var(--accent-weak);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .level-prog {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .level-prog strong {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
   }
 
   .paper {
