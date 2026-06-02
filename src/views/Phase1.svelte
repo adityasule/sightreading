@@ -260,6 +260,17 @@
       Formatter: m.Formatter,
       Voice: m.Voice,
     };
+    // Gate the first render on the music font being ready. VexFlow's default
+    // family is "Bravura,Academico"; before those load it lays out with wrong
+    // glyph metrics and the stem detaches / shifts right (it only looked right
+    // after a reload because the font was then cached). Loading them
+    // explicitly removes the race instead of relying on a lazy load mid-render.
+    try {
+      await m.VexFlow.loadFonts('Bravura', 'Academico');
+    } catch {
+      /* font fetch failed (offline / no FontFace API) — render anyway, worst
+         case is the original first-paint glitch, self-corrects on next card */
+    }
     next();
   });
 
@@ -278,7 +289,7 @@
   </div>
 
   <header class="head">
-    <h2>Phase 1 — Single Notes</h2>
+    <h2>Notation</h2>
     <p class="muted">Name the note on the staff.</p>
   </header>
 

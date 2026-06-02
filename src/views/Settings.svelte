@@ -52,7 +52,7 @@
   <section class="card setting">
     <div class="setting-text">
       <h3>Clefs</h3>
-      <p class="muted">Which staves appear in the Phase 1 deck.</p>
+      <p class="muted">Which staves appear in the Notation deck.</p>
     </div>
     <div class="checks">
       <label class="check">

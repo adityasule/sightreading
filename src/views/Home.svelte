@@ -4,11 +4,12 @@
   import { buildDeck } from '../lib/music.js';
   import * as srs from '../lib/spaced-repetition.js';
 
-  // Phase 1 "Today" snapshot. Loaded once on mount (Home remounts on every
+  // Notation "Today" snapshot. Loaded once on mount (Home remounts on every
   // navigation), then derived against the live deck so it tracks settings.
   const srsState = srs.loadState('srt:phase1');
   const deck = $derived(buildDeck(settings));
   const today = $derived(srs.summary(srsState, deck, settings.newCardsPerDay));
+  const trend = srs.stats(srsState); // streak + lifetime accuracy
 
   // The primary action adapts to what's waiting.
   const cta = $derived(
@@ -21,24 +22,25 @@
           : { label: 'Practice notes', to: 'phase1' }
   );
 
+  // User-facing musical names; route ids stay as the internal phase ids.
   const phases = [
     {
       id: 'phase1',
-      label: 'Phase 1',
-      title: 'Single notes',
+      title: 'Notation',
       blurb: 'Read one note on the treble & bass clef.',
+      ready: true,
     },
     {
       id: 'phase2',
-      label: 'Phase 2',
-      title: 'Triads',
+      title: 'Chords',
       blurb: 'Identify major / minor three-note chords.',
+      ready: false,
     },
     {
       id: 'phase3',
-      label: 'Phase 3',
-      title: 'Key signatures',
+      title: 'Key Signatures',
       blurb: 'Name the major key from its signature.',
+      ready: false,
     },
   ];
 </script>
@@ -54,7 +56,7 @@
   <section class="card today">
     <div class="today-head">
       <span class="badge">Today</span>
-      <h3>Phase 1 — Single notes</h3>
+      <h3>Notation — Single notes</h3>
     </div>
 
     {#if today.total === 0}
@@ -66,6 +68,14 @@
         <span><strong>{today.due}</strong> due</span>
         <span><strong>{today.newRemaining}</strong> new left</span>
         <span><strong>{today.learned}</strong>/{today.total} learned</span>
+        {#if trend.streak > 0}
+          <span class="streak"
+            >🔥 <strong>{trend.streak}</strong>-day streak</span
+          >
+        {/if}
+        {#if trend.accuracy !== null}
+          <span><strong>{trend.accuracy}%</strong> accuracy</span>
+        {/if}
       </div>
     {/if}
 
@@ -77,7 +87,7 @@
   <div class="phases">
     {#each phases as p}
       <button type="button" class="card phase" onclick={() => go(p.id)}>
-        <span class="badge">{p.label}</span>
+        <span class="badge" class:soon={!p.ready}>{p.ready ? 'Now' : 'Soon'}</span>
         <h3>{p.title}</h3>
         <p class="muted">{p.blurb}</p>
       </button>
@@ -129,6 +139,9 @@
   .today-stats strong {
     color: var(--fg);
     font-variant-numeric: tabular-nums;
+  }
+  .today-stats .streak strong {
+    color: var(--accent);
   }
   .today .empty {
     margin: 0;
@@ -186,6 +199,12 @@
     background: var(--accent-weak);
     padding: 3px 8px;
     border-radius: 999px;
+  }
+
+  /* Not-yet-built phases: a neutral "Soon" pill instead of the accent badge. */
+  .badge.soon {
+    color: var(--muted);
+    background: var(--surface-2);
   }
 
   .note {

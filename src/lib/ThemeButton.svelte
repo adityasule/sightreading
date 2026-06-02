@@ -72,8 +72,9 @@
     stroke-linejoin: round;
   }
 
-  /* Hide the text label on very narrow screens — the icon carries it. */
-  @media (max-width: 380px) {
+  /* On narrow screens the header also carries the hamburger + app title, so
+     drop the text label early and let the icon carry the control. */
+  @media (max-width: 480px) {
     .lbl {
       display: none;
     }

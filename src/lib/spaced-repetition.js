@@ -7,7 +7,8 @@
 // State shape:
 //   {
 //     cards: { [id]: { box, dueAt } },
-//     daily: { day: "YYYY-MM-DD", introduced: <count> }
+//     daily: { day: "YYYY-MM-DD", introduced: <count> },
+//     history: { [day]: { seen, correct } }  // per-day answer log (for streak/accuracy)
 //   }
 
 const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30];
@@ -24,6 +25,14 @@ function dayKey(t = now()) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** dayKey for N local calendar days before today (0 = today). */
+function dayKeyAgo(n) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - n);
+  return dayKey(d.getTime());
 }
 
 function emptyState() {
@@ -72,6 +81,16 @@ export function recordAnswer(state, cardId, correct) {
     : 0;
   card.dueAt = now() + BOX_INTERVALS_DAYS[card.box] * DAY_MS;
   state.cards[cardId] = card;
+
+  // Log the answer against today so Home can show a streak + accuracy. Mirrors
+  // the in-session counter but persists across sessions and days.
+  if (!state.history) state.history = {};
+  const k = dayKey();
+  const h = state.history[k] ?? { seen: 0, correct: 0 };
+  h.seen += 1;
+  if (correct) h.correct += 1;
+  state.history[k] = h;
+
   return state;
 }
 
@@ -118,4 +137,32 @@ export function summary(state, deck, newPerDay) {
     total: deck.length,
     newRemaining: Math.max(0, newPerDay - state.daily.introduced),
   };
+}
+
+/**
+ * Cross-session stats for the Home dashboard, derived from the day log:
+ *   - streak:   consecutive days with activity, counting back from today (or
+ *               from yesterday if today is untouched, so the streak only breaks
+ *               after a full missed day).
+ *   - accuracy: lifetime first-attempt accuracy (%), or null if nothing logged.
+ */
+export function stats(state) {
+  const hist = state.history ?? {};
+
+  let seen = 0;
+  let correct = 0;
+  for (const k in hist) {
+    seen += hist[k].seen;
+    correct += hist[k].correct;
+  }
+  const accuracy = seen ? Math.round((correct / seen) * 100) : null;
+
+  let streak = 0;
+  let n = hist[dayKeyAgo(0)] ? 0 : 1; // grace day: keep the streak alive today
+  while (hist[dayKeyAgo(n)]?.seen > 0) {
+    streak += 1;
+    n += 1;
+  }
+
+  return { streak, accuracy };
 }

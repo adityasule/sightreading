@@ -299,19 +299,28 @@ plan below:
   race: glyph metrics are wrong before Bravura loads. Fix by gating the first
   render on `document.fonts.ready` (or re-rendering once fonts resolve). → M1c.
 
-### Milestone 1c — Bugfixes & UX polish
+### Milestone 1c — Bugfixes & UX polish ✅ complete
 User-facing fixes and polish surfaced by the Milestone 1 review, done before the
 scale-progression feature so the app feels right first.
-- **Rename UI terminology** — Notation / Chords / Key Signatures everywhere the
-  user can see (nav, Home cards, view headers); keep internal route ids and
-  storage keys unchanged
-- **Mobile hamburger nav** — replace the narrow-screen bottom tab bar with a
-  hamburger-driven drawer; keep the side nav on wide screens
-- **Fix the first-render stem bug** — await font readiness (`document.fonts
-  .ready`) before the first VexFlow render, or re-render once fonts resolve
-- Dark mode pass
-- "Today" dashboard polish (cards due, streak, accuracy)
-- Responsive audit on iPhone, iPad, desktop
+- **Rename UI terminology** ✅ — Notation / Chords / Key Signatures everywhere
+  the user can see (nav, Home cards, today snapshot, view headers, Settings
+  copy); internal route ids and storage keys (`srt:phase1`) unchanged
+- **Mobile hamburger nav** ✅ — the narrow-screen bottom tab bar is now a
+  hamburger-driven off-canvas drawer (scrim backdrop, closes on Escape /
+  backdrop / selection); the side nav stays on wide screens (≥760px)
+- **Fix the first-render stem bug** ✅ — root cause was VexFlow 5 lazily
+  fetching its music font (Bravura) from a CDN mid-render, so the first paint
+  used wrong glyph metrics. Fixed by awaiting `VexFlow.loadFonts('Bravura',
+  'Academico')` before the first render (more reliable than `document.fonts
+  .ready`, which resolves early if the FontFace isn't registered yet)
+- Dark mode pass ✅ — new nav drawer, scrim, hamburger, and dashboard badges all
+  use theme tokens; audited at 390/500/1100px in light + dark
+- "Today" dashboard polish ✅ — per-day answer log persisted in SR state; Home
+  surfaces cards due, a day streak (🔥, with a one-day grace), and lifetime
+  accuracy; phase cards gained Now/Soon status badges
+- Responsive audit ✅ — verified phone (390), tablet/desktop; fixed a latent
+  header overflow on phones (the implicit grid column sized to max-content;
+  constrained with `minmax(0, 1fr)`)
 
 ### Milestone 1d — Scale-based learning progression
 Full design in Design Notes → Learning progression. Decided: major + natural
