@@ -10,7 +10,23 @@ npm install
 npm run dev      # http://localhost:5173 (also exposed on your LAN)
 npm run build    # outputs ./dist
 npm run preview  # serve ./dist locally on :4173 (also exposed on your LAN)
+npm test         # run the unit tests once
 ```
+
+## Tests
+
+[Vitest](https://vitest.dev) unit-tests the pure-logic modules (`music.js`,
+`spaced-repetition.js`, `progression.js`) — range math, deck building, the
+Leitner scheduler, and curriculum/level bucketing. Tests live next to the code
+as `src/lib/*.test.js`.
+
+```bash
+npm test            # run once (CI-style)
+npm run test:watch  # re-run on change while developing
+```
+
+Vitest is a dev dependency and never ships in the build; the UI/Svelte
+components are verified manually by running the app.
 
 ## Testing on your phone / iPad (same Wi-Fi)
 

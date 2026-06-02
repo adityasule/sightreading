@@ -15,9 +15,13 @@ npm install
 npm run dev      # vite dev server on :5173 (also on LAN — see README for phone testing)
 npm run build    # production build → ./dist
 npm run preview  # serve ./dist on :4173
+npm test         # run the Vitest unit tests once (npm run test:watch to watch)
 ```
-There is **no test runner and no linter** configured. "Verify" means running the
-app (`npm run dev`) and exercising the change in the browser.
+**Vitest** (dev-only, never shipped) covers the pure-logic modules — `music.js`,
+`spaced-repetition.js`, `progression.js` — via colocated `src/lib/*.test.js`
+files. Run `npm test` after touching those. There is **no linter** configured,
+and the Svelte/UI components have no tests: "verify" the UI by running the app
+(`npm run dev`) and exercising the change in the browser.
 
 ## Architecture
 Svelte 5 + Vite SPA. View-switching by simple state, no router.
