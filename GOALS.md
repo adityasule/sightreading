@@ -136,10 +136,105 @@ Worth revisiting after Phase 1 ships:
 - **Algorithm.** If Leitner feels too coarse, swap in SM-2 (Anki's). The SR
   module is behind a small interface, so the swap stays local.
 
+### Learning progression — scale-based note introduction (planned, M1d)
+Today new cards are introduced in raw deck (MIDI) order, which is arbitrary and
+not very musical. Instead, introduce notes **grouped by scale**, mastering one
+level before unlocking the next.
+
+**Scope (decided):** major and natural-minor scales only. Other modes (harmonic
+/ melodic minor, church modes, exotic scales) are explicitly out of scope until
+every feature in this plan ships — see Future ideas.
+
+**Order — circle of fifths, alternating outward from C.** Each step adds the
+fewest possible new accidentals, which is the natural difficulty gradient for a
+reader. Because a natural minor shares its *relative* major's key signature (and
+exact note set), the two pair onto one level for free:
+
+| #  | Level                 | Key sig | New note to read |
+|----|-----------------------|---------|------------------|
+| 1  | C major / A minor     | 0       | all 7 naturals (foundation) |
+| 2  | G major / E minor     | 1♯      | F♯ |
+| 3  | F major / D minor     | 1♭      | B♭ |
+| 4  | D major / B minor     | 2♯      | C♯ |
+| 5  | B♭ major / G minor    | 2♭      | E♭ |
+| 6  | A major / F♯ minor    | 3♯      | G♯ |
+| 7  | E♭ major / C minor    | 3♭      | A♭ |
+| 8  | E major / C♯ minor    | 4♯      | D♯ |
+| 9  | A♭ major / F minor    | 4♭      | D♭ |
+| 10 | B major / G♯ minor    | 5♯      | A♯ |
+| 11 | D♭ major / B♭ minor   | 5♭      | G♭ |
+
+After level 11 every card is introduced: all 7 naturals plus both spellings of
+each of the 5 black keys. Each black-key spelling is introduced in its *home*
+key (F♯ at G major, G♭ at D♭ major), which is the correct reading context and
+maps cleanly onto the existing two-cards-per-black-key deck. Keys past 5♯/5♭
+(6♯, 7♭, …) only add enharmonic naturals (E♯, C♭, …) that aren't in the deck,
+so the sequence stops at 11 levels. Note "C minor" lands at level 7 as the
+relative of E♭ major — stepping straight from C major to *parallel* C minor
+would jump to 3 flats and break the gradient, so the circle-of-fifths rule wins.
+
+**Scale model.** A scale's group is its full note set within the current range
+and enabled clefs (e.g. G major = F♯ G A B C D E). Scales overlap heavily; a
+card is introduced once and is then shared. In practice, advancing a level means
+mastering the one new accidental that level adds, since the rest is inherited.
+
+**Minor scales (decided): paired, not separate.** Each level is one gate
+labeled "X major / Y minor". The relative minor adds no new cards to read, so it
+gets no separate gate — it rides along as a second name on the same level.
+
+**Foundation split (decided): C major splits by register.** The naturals
+foundation is large (~30+ cards), so it's two sub-levels: **on-staff naturals
+first** (notes between the staff's outer lines), then **ledger-line naturals**
+(everything above/below). Ledger lines are the genuinely hard part, so this
+gives quicker early wins on a solid base. Within every level, introduction is
+ordered on-staff before ledger; only the foundation is large enough to warrant a
+checkpoint *between* its two sub-levels — accidental levels (~6–8 cards) unlock
+as a single step.
+
+**Completion bar (decided): box ≥ 2 ("reviewed twice").** A level is complete
+when every card in it (in range, enabled clefs) has reached Leitner box 2 — i.e.
+answered correctly on two separate reviews. Implication: since a card goes to a
+1-day interval after its first correct answer, box 2 requires a next-day review,
+so each level spans ≥2 calendar days. This is intended — it makes the curriculum
+a multi-week drip rather than a single-session blitz.
+
+**Progression gate.** When the current level is complete, *ask the user if
+they're ready* before unlocking the next — an explicit "Start [next level]?"
+prompt (shown inline in the quiz and reflected on Home), never an automatic
+jump. One level at a time, no skipping ahead.
+
+**Progression is global across clefs (decided).** A pitch class is the same
+reading skill on either clef, so a level is judged complete across all enabled
+clefs at once; the level is one unit, not per-clef.
+
+**Mechanics & edge cases (defaults — flag if any should change):**
+- The scheduler introduces new cards only from the current level (still capped
+  by the daily new-card budget); reviews of already-learned cards continue
+  normally regardless of level.
+- The scale sequence + the user's current level persist alongside SR state.
+- *Settings change mid-progression:* completion is always evaluated against the
+  live deck, so enabling a clef or widening the range can re-open a previously
+  complete level when new in-range cards appear. Self-correcting; no special
+  handling.
+- *"Keep practicing" (caught-up state):* draws only from already-introduced
+  (unlocked) cards, never from notes the user hasn't reached yet.
+- *Migrating existing progress:* cards introduced before M1d (in MIDI order) are
+  mapped to their level on load; the current level is the furthest one fully at
+  box ≥ 2, else the first incomplete level.
+
 ### UI
 - Single-page app, view-switching driven by simple state (no router lib in v1)
-- Four views: Home/Today, Phase 1, Phase 2, Phase 3, Settings
-- Bottom tab bar on narrow screens, side nav on wide screens
+- Four views: Home/Today, Notation, Chords, Key Signatures, Settings
+- **User-facing names vs. internal ids.** "Phase 1/2/3" is developer shorthand
+  and must never appear in the UI. The user sees musical names; the code keeps
+  the short route ids. Mapping:
+  - Phase 1 → **Notation** (route id `phase1`, storage key `srt:phase1`)
+  - Phase 2 → **Chords** (route id `phase2`)
+  - Phase 3 → **Key Signatures** (route id `phase3`)
+- Navigation: **side nav on wide screens; a hamburger menu on narrow screens**
+  (the bottom tab bar tested poorly on mobile — it was distracting and got in
+  the way of the answer pad). The hamburger opens an overlay/drawer and stays
+  out of the way until summoned.
 - Letter input via on-screen A–G buttons (touch-friendly; min 44px targets)
 - Hardware keyboard A–G also accepted on desktop
 - Dark mode via `prefers-color-scheme`
@@ -188,11 +283,69 @@ Worth revisiting after Phase 1 ships:
 - "Today" counts surfaced on the Home view ✅ — due / new-left / learned for
   Phase 1, with an adaptive primary action (Review / Learn / Practice)
 
-### Milestone 2 — Polish & PWA
-- Web app manifest + service worker for offline use
+### Milestone 1 review — feedback incorporated (2026-06-02)
+After Milestone 1 shipped, a review surfaced four items, now folded into the
+plan below:
+- **Terminology** — "Phase 1/2/3" is dev jargon and shouldn't be user-facing.
+  Use musical names (Notation / Chords / Key Signatures). → M1c.
+- **Scale-based note order** — introduce notes grouped by scale, in
+  circle-of-fifths order (C major → G major → F major → D major → …), with a
+  "ready for the next level?" gate. More musical, more valuable. → M1d
+  (full design resolved 2026-06-02; see Design Notes → Learning progression).
+- **Mobile nav** — the bottom tab bar is distracting on phones; replace it with
+  a hamburger menu that stays out of the way. → M1c.
+- **Stem bug** — on the very first note render the stem is detached and shifted
+  right (correct after a reload). Almost certainly a VexFlow music-font load
+  race: glyph metrics are wrong before Bravura loads. Fix by gating the first
+  render on `document.fonts.ready` (or re-rendering once fonts resolve). → M1c.
+
+### Milestone 1c — Bugfixes & UX polish
+User-facing fixes and polish surfaced by the Milestone 1 review, done before the
+scale-progression feature so the app feels right first.
+- **Rename UI terminology** — Notation / Chords / Key Signatures everywhere the
+  user can see (nav, Home cards, view headers); keep internal route ids and
+  storage keys unchanged
+- **Mobile hamburger nav** — replace the narrow-screen bottom tab bar with a
+  hamburger-driven drawer; keep the side nav on wide screens
+- **Fix the first-render stem bug** — await font readiness (`document.fonts
+  .ready`) before the first VexFlow render, or re-render once fonts resolve
 - Dark mode pass
-- "Today" dashboard (cards due, streak, accuracy)
+- "Today" dashboard polish (cards due, streak, accuracy)
 - Responsive audit on iPhone, iPad, desktop
+
+### Milestone 1d — Scale-based learning progression
+Full design in Design Notes → Learning progression. Decided: major + natural
+minor only; circle-of-fifths order (11 levels, C through 5♯/5♭); minors paired
+onto each level; C-major foundation split by register (on-staff, then ledger);
+a level completes at Leitner box ≥ 2; progression is global across clefs.
+- Define the 11-level scale sequence + per-level note groups (with the
+  register-split foundation) in `music.js`
+- Introduce new cards only from the current level; detect completion at box ≥ 2
+- Explicit "Start [next level]?" gate before unlocking the next level (inline in
+  the quiz, reflected on Home) — one level at a time, no skipping
+- Persist the sequence + current level alongside SR state; migrate pre-M1d
+  progress by mapping introduced cards to their level
+- Surface the current level (e.g. "C major / A minor") + progress in the quiz
+  header and the Home "Today" snapshot
+
+### Milestone 2 — Engineering polish, PWA & productionization
+Purely engineering-side hardening; no new user-facing features.
+- Web app manifest + service worker for offline use (PWA)
+- Performance budget verification against the NFRs (<200KB initial JS, <1s TTI
+  on 4G) — code-split audit, confirm VexFlow stays lazy-loaded
+- Asset/build optimization (caching headers, hashing) and a production error
+  boundary so a render failure never blanks the app
+- localStorage robustness — versioned state blob + safe migration/fallback
+- **Publish to GitHub as a public open-source repo** (fleshed out in detail when
+  we reach M2; captured here so it isn't lost):
+  - *Licensing* — add an OSS license (e.g. MIT) + the year/owner line
+  - *Privacy* — audit the repo so it leaks no personal developer info beyond
+    what GitHub inherently exposes: scrub author name/email in commit history
+    and config as desired, the README's machine-specific hostnames/IPs, the
+    `.idea/` and any local paths, and `userEmail`-type data
+  - *Secrets* — ensure no production secrets are committed or in history;
+    confirm `.gitignore` covers env/secret files and that the static app
+    genuinely ships none (consistent with the no-backend architecture)
 
 ### Milestone 3 — First production deploy
 - Create Cloudflare Pages project, connect to git
@@ -217,3 +370,10 @@ Worth revisiting after Phase 1 ships:
   independently.
 - **VexFlow version pin**: pin to `^5.0.0` for now; revisit on each minor
   bump.
+- **Scale progression (M1d)**: all major decisions resolved (2026-06-02) — see
+  Design Notes → Learning progression. Scope (major + natural minor), order
+  (circle of fifths, 11 levels), minor pairing, register-split foundation,
+  box ≥ 2 completion, and global-across-clefs progression are all settled. The
+  remaining items are low-stakes implementation defaults documented in that
+  section (settings-change re-evaluation, practice-mode card pool, pre-M1d
+  progress migration); flag during M1d only if any should change.
