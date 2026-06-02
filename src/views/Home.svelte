@@ -1,5 +1,25 @@
 <script>
   import { go } from '../lib/nav.svelte.js';
+  import { settings } from '../lib/settings.svelte.js';
+  import { buildDeck } from '../lib/music.js';
+  import * as srs from '../lib/spaced-repetition.js';
+
+  // Phase 1 "Today" snapshot. Loaded once on mount (Home remounts on every
+  // navigation), then derived against the live deck so it tracks settings.
+  const srsState = srs.loadState('srt:phase1');
+  const deck = $derived(buildDeck(settings));
+  const today = $derived(srs.summary(srsState, deck, settings.newCardsPerDay));
+
+  // The primary action adapts to what's waiting.
+  const cta = $derived(
+    today.total === 0
+      ? { label: 'Open Settings', to: 'settings' }
+      : today.due > 0
+        ? { label: `Review ${today.due} due`, to: 'phase1' }
+        : today.newRemaining > 0 && today.learned < today.total
+          ? { label: 'Learn new notes', to: 'phase1' }
+          : { label: 'Practice notes', to: 'phase1' }
+  );
 
   const phases = [
     {
@@ -31,6 +51,29 @@
     </p>
   </header>
 
+  <section class="card today">
+    <div class="today-head">
+      <span class="badge">Today</span>
+      <h3>Phase 1 — Single notes</h3>
+    </div>
+
+    {#if today.total === 0}
+      <p class="muted empty">
+        No notes in the deck. Enable a clef under Settings to get started.
+      </p>
+    {:else}
+      <div class="today-stats">
+        <span><strong>{today.due}</strong> due</span>
+        <span><strong>{today.newRemaining}</strong> new left</span>
+        <span><strong>{today.learned}</strong>/{today.total} learned</span>
+      </div>
+    {/if}
+
+    <button type="button" class="btn-primary" onclick={() => go(cta.to)}>
+      {cta.label}
+    </button>
+  </section>
+
   <div class="phases">
     {#each phases as p}
       <button type="button" class="card phase" onclick={() => go(p.id)}>
@@ -58,6 +101,45 @@
   }
   .intro p {
     margin: 0;
+  }
+
+  .today {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .today-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .today-head h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .today-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+  .today-stats strong {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .today .empty {
+    margin: 0;
+  }
+  .today .btn-primary {
+    align-self: stretch;
+  }
+  @media (min-width: 480px) {
+    .today .btn-primary {
+      align-self: flex-start;
+    }
   }
 
   .phases {

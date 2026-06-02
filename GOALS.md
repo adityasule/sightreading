@@ -41,7 +41,10 @@ browser. (Future option: opt-in export/import a JSON blob.)
 
 ### Phase 1 — Single notes, treble & bass clef
 **In scope**
-- Render one note at a time on either clef
+- Render one note at a time on either clef — naturals and accidentals
+  (sharps/flats). Each black key appears as two cards (e.g. C♯ and D♭), since
+  they read differently on the staff; graded by spelling in Letters mode and
+  by key (pitch class) in Piano mode.
 - User answers via a selectable **answer mode** (Settings toggle):
   - **Letters** — on-screen A–G pad; hardware keyboard A–G also accepted.
     Doubles as both the "multiple choice" and "freeform typing" idea: all
@@ -60,13 +63,13 @@ browser. (Future option: opt-in export/import a JSON blob.)
 - Session header: cards due, new-cards remaining today, learned/total, accuracy %
 
 **Deck (current)**
-- Hardcoded, naturals only, generated from a fixed range per clef:
-  treble C4–A5, bass G2–E4 (26 cards total). Lives in `src/lib/music.js`.
-  Widening to the full "2 ledger lines above/below, configurable" range is a
-  later iteration — see Milestone 1b.
+- Naturals + accidentals, generated per clef from a configurable range:
+  N ledger lines above and below each staff (Settings → Note range, default
+  N=2, allowed 0–4). Lives in `src/lib/music.js`. Each in-range black key
+  contributes two cards (sharp and flat spelling). At the default N=2 the
+  treble spans A3–C6 and the bass C2–E4 (~80 cards with both clefs).
 
 **Out of scope (Phase 1)**
-- Accidentals (sharps/flats) — defer to a later iteration of Phase 1
 - Note duration / rhythm reading
 - Audio playback of the rendered note
 - MIDI keyboard input
@@ -123,10 +126,13 @@ browser. (Future option: opt-in export/import a JSON blob.)
   (`srt:phase1`); the SR module is generic and card-agnostic
 
 Worth revisiting after Phase 1 ships:
-- **In-session re-test of misses.** A wrong answer currently sends the card to
-  box 0 (1-day interval), so a missed note doesn't recur within the same
-  session. For a drill that may be too lenient — consider a short "relearning"
-  step (re-show after N cards) before the card re-enters the day-scale ladder.
+- **In-session re-test of misses.** ✅ Implemented as a session-only
+  relearning queue in `Phase1.svelte` (`RELEARN_GAP = 3`): a missed card still
+  drops to box 0 in the persistent scheduler, but also re-appears after 3 other
+  cards within the session. The re-test is reinforcement only — it doesn't call
+  `recordAnswer` again or count toward first-attempt session accuracy. The SR
+  module itself is unchanged. Future tuning: make the gap configurable, or gate
+  the box-0 scheduling behind passing the relearning step (true learning steps).
 - **Algorithm.** If Leitner feels too coarse, swap in SM-2 (Anki's). The SR
   module is behind a small interface, so the swap stays local.
 
@@ -171,12 +177,16 @@ Worth revisiting after Phase 1 ships:
   persistence, caught-up + keep-practicing states
 - Settings: answer mode, clef toggle (treble/bass), new-cards-per-day
 
-### Milestone 1b — Phase 1 depth
-- Widen the deck to the full configurable range (2 ledger lines above/below
-  each staff) instead of the fixed starter range
-- Decide & implement in-session re-test of missed cards (see Design Notes)
-- "Today" counts surfaced on the Home view, not just inside Phase 1
-- Optional: accidentals as a later Phase 1 iteration
+### Milestone 1b — Phase 1 depth ✅ complete
+- Accidentals (sharps/flats) ✅ — both spellings per black key, Letters pad
+  gets ♯/♭ modifiers, Piano gets interactive black keys
+- Configurable note range ✅ — N ledger lines above/below each staff
+  (Settings → Note range, default 2), replacing the fixed starter range
+- In-session re-test of missed cards ✅ — a miss re-appears after 3 other
+  cards (session-only relearning queue); the re-test is reinforcement only and
+  doesn't touch the scheduler or first-attempt accuracy (see Design Notes)
+- "Today" counts surfaced on the Home view ✅ — due / new-left / learned for
+  Phase 1, with an adaptive primary action (Review / Learn / Practice)
 
 ### Milestone 2 — Polish & PWA
 - Web app manifest + service worker for offline use
@@ -196,7 +206,6 @@ Worth revisiting after Phase 1 ships:
 - Audio playback of the rendered note (Web Audio API — free, client-side)
 - Optional MIDI input (Web MIDI API)
 - Progress export/import as JSON
-- Sharps/flats added to Phase 1
 - Relative-minor identification in Phase 3
 
 ---

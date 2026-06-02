@@ -1,47 +1,76 @@
 <script>
-  // One-octave piano input for Phase 1. Only the seven white keys are
-  // interactive (no accidentals yet); the black keys are drawn for realism
-  // but are inert. We answer by *letter*, so octave doesn't matter here.
+  // One-octave piano input for Phase 1. All twelve keys are interactive: the
+  // seven white naturals plus the five black accidentals. We grade by *pitch
+  // class* (which key), so octave is ignored and a black key answers for both
+  // of its enharmonic spellings (C♯ and D♭ are the same key).
   //
   // Props:
-  //   onpick(letter)  called when a white key is pressed
-  //   disabled        block input (e.g. while showing feedback)
-  //   picked          the letter the user chose (for feedback colouring)
-  //   answer          the correct letter (revealed on feedback)
-  //   revealed        whether to show correct/incorrect colouring
+  //   onpick(pc)   called with the pressed key's pitch class
+  //   disabled     block input (e.g. while showing feedback)
+  //   pickedPc     the pitch class the user chose (for feedback colouring)
+  //   correctPc    the correct pitch class (revealed on feedback)
+  //   revealed     whether to show correct/incorrect colouring
 
-  let { onpick, disabled = false, picked = null, answer = null, revealed = false } =
-    $props();
+  let {
+    onpick,
+    disabled = false,
+    pickedPc = null,
+    correctPc = null,
+    revealed = false,
+  } = $props();
 
-  const WHITE = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  // White keys, left to right, with pitch class.
+  const WHITE = [
+    { letter: 'C', pc: 0 },
+    { letter: 'D', pc: 2 },
+    { letter: 'E', pc: 4 },
+    { letter: 'F', pc: 5 },
+    { letter: 'G', pc: 7 },
+    { letter: 'A', pc: 9 },
+    { letter: 'B', pc: 11 },
+  ];
 
-  // Black keys sit on the boundaries after C, D, F, G, A (in sevenths).
-  const BLACK = [1, 2, 4, 5, 6];
+  // Black keys sit on the gaps after C, D, F, G, A. `pos` is the white-key
+  // boundary (in sevenths) the key straddles; `pc` is its pitch class.
+  const BLACK = [
+    { pos: 1, pc: 1, name: 'C♯ / D♭' },
+    { pos: 2, pc: 3, name: 'D♯ / E♭' },
+    { pos: 4, pc: 6, name: 'F♯ / G♭' },
+    { pos: 5, pc: 8, name: 'G♯ / A♭' },
+    { pos: 6, pc: 10, name: 'A♯ / B♭' },
+  ];
 
-  function keyClass(letter) {
+  function keyClass(pc) {
     if (!revealed) return '';
-    if (letter === answer) return 'correct';
-    if (letter === picked) return 'wrong';
+    if (pc === correctPc) return 'correct';
+    if (pc === pickedPc) return 'wrong';
     return '';
   }
 </script>
 
 <div class="piano" role="group" aria-label="Piano keyboard">
   <div class="whites">
-    {#each WHITE as letter}
+    {#each WHITE as key}
       <button
         type="button"
-        class="white {keyClass(letter)}"
+        class="white {keyClass(key.pc)}"
         {disabled}
-        aria-label={letter}
-        onclick={() => onpick?.(letter)}
+        aria-label={key.letter}
+        onclick={() => onpick?.(key.pc)}
       >
-        <span class="label">{letter}</span>
+        <span class="label">{key.letter}</span>
       </button>
     {/each}
   </div>
-  {#each BLACK as pos}
-    <span class="black" style="left: {(pos / 7) * 100}%" aria-hidden="true"></span>
+  {#each BLACK as key}
+    <button
+      type="button"
+      class="black {keyClass(key.pc)}"
+      style="left: {(key.pos / 7) * 100}%"
+      {disabled}
+      aria-label={key.name}
+      onclick={() => onpick?.(key.pc)}
+    ></button>
   {/each}
 </div>
 
@@ -101,16 +130,37 @@
     color: var(--accent-fg);
   }
 
-  /* Decorative, non-interactive accidentals. */
+  /* Black keys overlap the white-key boundaries. */
   .black {
     position: absolute;
     top: 0;
     width: 9%;
     height: 95px;
+    min-height: 0;
+    padding: 0;
     transform: translateX(-50%);
     background: #27272a;
+    border: 1px solid #18181b;
     border-radius: 0 0 4px 4px;
-    pointer-events: none;
+    box-shadow: var(--shadow-sm);
     z-index: 2;
+  }
+
+  .black:hover:not(:disabled) {
+    background: #3f3f46;
+  }
+
+  .black:active:not(:disabled) {
+    background: #52525b;
+  }
+
+  .black.correct {
+    background: var(--good);
+    border-color: var(--good);
+  }
+
+  .black.wrong {
+    background: var(--bad);
+    border-color: var(--bad);
   }
 </style>

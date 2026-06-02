@@ -7,15 +7,23 @@
  *   answerMode      'letters' | 'piano'   how the user inputs an answer
  *   treble / bass   booleans              which clefs are in the deck
  *   newCardsPerDay  number                new-card introduction budget / day
+ *   ledgerLines     number                ledger lines above/below each staff
+ *                                         (deck range size)
  */
 
+import { DEFAULT_LEDGER_LINES } from './music.js';
+
 const STORAGE_KEY = 'srt:settings';
+
+export const LEDGER_MIN = 0;
+export const LEDGER_MAX = 4;
 
 const DEFAULTS = {
   answerMode: 'letters',
   treble: true,
   bass: true,
   newCardsPerDay: 5,
+  ledgerLines: DEFAULT_LEDGER_LINES,
 };
 
 function read() {
@@ -47,4 +55,10 @@ export function setSetting(key, value) {
 export function setNewCardsPerDay(n) {
   const v = Math.max(0, Math.min(50, Math.round(Number(n) || 0)));
   setSetting('newCardsPerDay', v);
+}
+
+/** Clamp + persist the ledger-line depth (controls the deck's note range). */
+export function setLedgerLines(n) {
+  const v = Math.max(LEDGER_MIN, Math.min(LEDGER_MAX, Math.round(Number(n) || 0)));
+  setSetting('ledgerLines', v);
 }

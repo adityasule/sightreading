@@ -4,6 +4,9 @@
     settings,
     setSetting,
     setNewCardsPerDay,
+    setLedgerLines,
+    LEDGER_MIN,
+    LEDGER_MAX,
   } from '../lib/settings.svelte.js';
 
   const answerModes = [
@@ -68,6 +71,35 @@
         />
         Bass
       </label>
+    </div>
+  </section>
+
+  <section class="card setting">
+    <div class="setting-text">
+      <h3>Note range</h3>
+      <p class="muted">
+        Ledger lines above and below each staff. More lines means a wider range
+        of notes.
+      </p>
+    </div>
+    <div class="stepper" role="group" aria-label="Ledger lines">
+      <button
+        type="button"
+        aria-label="Narrower"
+        disabled={settings.ledgerLines <= LEDGER_MIN}
+        onclick={() => setLedgerLines(settings.ledgerLines - 1)}
+      >
+        −
+      </button>
+      <span class="count" aria-live="polite">{settings.ledgerLines}</span>
+      <button
+        type="button"
+        aria-label="Wider"
+        disabled={settings.ledgerLines >= LEDGER_MAX}
+        onclick={() => setLedgerLines(settings.ledgerLines + 1)}
+      >
+        +
+      </button>
     </div>
   </section>
 

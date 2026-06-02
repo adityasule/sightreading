@@ -1,13 +1,21 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { settings } from '../lib/settings.svelte.js';
-  import { buildDeck, LETTERS } from '../lib/music.js';
+  import {
+    buildDeck,
+    LETTERS,
+    ACCIDENTALS,
+    noteName,
+    pcOf,
+    pcName,
+  } from '../lib/music.js';
   import Piano from '../lib/Piano.svelte';
   import QuizSettings from '../lib/QuizSettings.svelte';
   import * as srs from '../lib/spaced-repetition.js';
 
   const STORAGE_KEY = 'srt:phase1';
   const ADVANCE_MS = 750; // auto-advance delay after a correct answer
+  const RELEARN_GAP = 3; // re-show a missed card after this many other cards
 
   let staffEl;
   let vex = null; // lazily-loaded VexFlow module
@@ -20,23 +28,55 @@
 
   let current = $state(null); // active card, or null when caught up
   let mode = $state('answering'); // 'answering' | 'feedback' | 'caughtup'
-  let picked = $state(null); // letter the user chose this round
+  let source = $state('scheduled'); // 'scheduled' | 'relearn' | 'practice'
+  let picked = $state(null); // { pc, name, letter?, accidental? } chosen this round
+  let pendingAcc = $state(''); // '' | '#' | 'b' — staged modifier in Letters mode
   let session = $state({ seen: 0, correct: 0 });
   let counts = $state({ due: 0, learned: 0, total: 0, newRemaining: 0 });
 
   let advanceTimer = null;
 
-  let isCorrect = $derived(
-    mode === 'feedback' && current && picked === current.letter
-  );
+  // In-session relearning: a miss re-appears after RELEARN_GAP other cards,
+  // so it registers before sinking into the day-scale schedule. Session-only
+  // (not persisted): [{ id, showAfter }], compared against `shown`, a counter
+  // of how many cards have been displayed this session.
+  let relearn = [];
+  let shown = 0;
+
+  // Letters mode grades the spelling (letter + accidental); Piano mode grades
+  // the key (pitch class), so C♯ and D♭ both accept the same black key.
+  function gradeCorrect(card, pick) {
+    if (!card || !pick) return false;
+    if (settings.answerMode === 'piano') return pick.pc === card.pc;
+    return pick.letter === card.letter && pick.accidental === card.accidental;
+  }
+
+  let isCorrect = $derived(mode === 'feedback' && gradeCorrect(current, picked));
 
   function refreshCounts() {
     counts = srs.summary(srsState, deck, settings.newCardsPerDay);
   }
 
+  // Show a card and tag where it came from (drives how its answer is scored).
+  function showCard(card, src) {
+    current = card;
+    source = src;
+    mode = 'answering';
+    shown += 1;
+    renderNote();
+  }
+
+  // Pull a relearning card off the queue by id, tolerating ones that have
+  // since left the deck (clef/range changed mid-session).
+  function takeRelearn(item) {
+    const card = deck.find((c) => c.id === item.id);
+    return card ?? null;
+  }
+
   function next() {
     clearTimeout(advanceTimer);
     picked = null;
+    pendingAcc = '';
 
     if (deck.length === 0) {
       current = null;
@@ -45,18 +85,30 @@
       return;
     }
 
+    // 1. A missed card whose relearning gap has elapsed takes priority.
+    let i = relearn.findIndex((r) => r.showAfter <= shown);
+    while (i !== -1) {
+      const card = takeRelearn(relearn.splice(i, 1)[0]);
+      if (card) return showCard(card, 'relearn');
+      i = relearn.findIndex((r) => r.showAfter <= shown);
+    }
+
+    // 2. The normal scheduler: a due card, or a fresh one within budget.
     const id = srs.pickNext(srsState, deck, settings.newCardsPerDay);
     srs.saveState(STORAGE_KEY, srsState); // persist any newly-introduced card
     refreshCounts();
+    if (id) return showCard(deck.find((c) => c.id === id), 'scheduled');
 
-    if (!id) {
-      current = null;
-      mode = 'caughtup';
-      return;
+    // 3. Nothing scheduled, but missed cards still pend — show the soonest now
+    //    rather than declaring "caught up" with relearning outstanding.
+    while (relearn.length) {
+      const card = takeRelearn(relearn.shift());
+      if (card) return showCard(card, 'relearn');
     }
-    current = deck.find((c) => c.id === id);
-    mode = 'answering';
-    renderNote();
+
+    // 4. Genuinely caught up.
+    current = null;
+    mode = 'caughtup';
   }
 
   // "Keep practicing" once caught up: drill a random card ahead of schedule.
@@ -64,24 +116,67 @@
   function practice() {
     clearTimeout(advanceTimer);
     picked = null;
+    pendingAcc = '';
     if (deck.length === 0) return;
-    current = deck[Math.floor(Math.random() * deck.length)];
-    mode = 'answering';
-    renderNote();
+    showCard(deck[Math.floor(Math.random() * deck.length)], 'practice');
   }
 
-  function answer(letter) {
+  function enqueueRelearn(id) {
+    relearn = relearn.filter((r) => r.id !== id); // de-dupe before re-adding
+    relearn.push({ id, showAfter: shown + RELEARN_GAP });
+  }
+
+  // Letters pad / hardware keyboard: submit the letter with the staged
+  // modifier (pendingAcc). pc is carried too so the answer still grades in
+  // Piano mode if a keyboard letter is used there.
+  function answerLetter(letter) {
     if (mode !== 'answering' || !current) return;
-    picked = letter;
-    const correct = letter === current.letter;
-    srs.recordAnswer(srsState, current.id, correct);
-    srs.saveState(STORAGE_KEY, srsState);
+    const accidental = pendingAcc;
+    commit({
+      letter,
+      accidental,
+      pc: pcOf(letter, accidental),
+      name: noteName(letter, accidental),
+    });
+  }
 
-    session.seen += 1;
-    if (correct) session.correct += 1;
+  // Piano: a pressed key, identified by pitch class.
+  function answerPiano(pc) {
+    if (mode !== 'answering' || !current) return;
+    commit({ pc, name: pcName(pc) });
+  }
 
+  // Toggle the staged sharp/flat for the next Letters answer (sticky, so a
+  // natural stays one tap; tapping the same modifier again clears it).
+  function toggleAcc(acc) {
+    if (mode !== 'answering') return;
+    pendingAcc = pendingAcc === acc ? '' : acc;
+  }
+
+  function commit(pick) {
+    picked = pick;
+    const correct = gradeCorrect(current, pick);
+
+    if (source === 'relearn') {
+      // Pure reinforcement: the miss is already on the schedule, so don't
+      // touch the scheduler or first-attempt session stats. Just keep the
+      // card cycling until it's answered correctly.
+      if (!correct) enqueueRelearn(current.id);
+    } else {
+      srs.recordAnswer(srsState, current.id, correct);
+      srs.saveState(STORAGE_KEY, srsState);
+
+      session.seen += 1;
+      if (correct) session.correct += 1;
+
+      // A first-time miss enters relearning; practice misses don't (practice
+      // already re-draws freely and shouldn't pad the session queue).
+      if (!correct && source === 'scheduled') enqueueRelearn(current.id);
+      refreshCounts();
+    }
+
+    pendingAcc = '';
     mode = 'feedback';
-    refreshCounts();
     renderNote(); // recolour the note green/red
 
     if (correct) advanceTimer = setTimeout(next, ADVANCE_MS);
@@ -104,21 +199,33 @@
       }
       return;
     }
-    // Answering: accept hardware A–G (letter mode affordance, but harmless
-    // to allow in piano mode too).
+    // Answering. Sharp/flat modifiers first (so they can be staged before a
+    // letter), then hardware A–G (a Letters affordance, harmless in Piano).
+    if (e.key === '#' || e.key === '+' || e.key === '=') {
+      toggleAcc('#');
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      toggleAcc('b');
+      return;
+    }
     const k = e.key.toUpperCase();
-    if (LETTERS.includes(k)) answer(k);
+    if (LETTERS.includes(k)) answerLetter(k);
   }
 
   function renderNote() {
     if (!vex || !staffEl || !current) return;
-    const { Renderer, Stave, StaveNote, Formatter, Voice } = vex;
+    const { Renderer, Stave, StaveNote, Accidental, Formatter, Voice } = vex;
     staffEl.innerHTML = '';
     const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
-    renderer.resize(320, 170);
+    // Reserve vertical room for the configured ledger lines so notes above or
+    // below the staff aren't clipped. Stable across cards (depends only on the
+    // setting), so the staff doesn't jump between notes.
+    const margin = 44 + (settings.ledgerLines ?? 2) * 12;
+    renderer.resize(320, margin * 2 + 44);
     const ctx = renderer.getContext();
 
-    const stave = new Stave(10, 35, 300).addClef(current.clef);
+    const stave = new Stave(10, margin, 300).addClef(current.clef);
     stave.setContext(ctx).draw();
 
     const note = new StaveNote({
@@ -126,8 +233,13 @@
       keys: [current.vexKey],
       duration: 'q',
     });
+    // The accidental in the key string sets the pitch but isn't drawn; the
+    // glyph must be added explicitly.
+    if (current.accidental) {
+      note.addModifier(new Accidental(current.accidental), 0);
+    }
     if (mode === 'feedback' && picked != null) {
-      const color = picked === current.letter ? '#16a34a' : '#dc2626';
+      const color = isCorrect ? '#16a34a' : '#dc2626';
       note.setStyle({ fillStyle: color, strokeStyle: color });
     }
 
@@ -144,6 +256,7 @@
       Renderer: m.Renderer,
       Stave: m.Stave,
       StaveNote: m.StaveNote,
+      Accidental: m.Accidental,
       Formatter: m.Formatter,
       Voice: m.Voice,
     };
@@ -199,16 +312,18 @@
     <div class="feedback" aria-live="polite">
       {#if mode === 'feedback' && current}
         {#if isCorrect}
-          <p class="good">Correct — that's <strong>{current.letter}</strong>.</p>
+          <p class="good">Correct — that's <strong>{current.name}</strong>.</p>
         {:else}
           <p class="bad">
-            That was <strong>{current.letter}</strong>
-            {#if picked}(you picked {picked}){/if}.
+            That was <strong>{current.name}</strong>
+            {#if picked}(you picked {picked.name}){/if}.
           </p>
           <button type="button" class="btn-primary" onclick={next}>
             Next
           </button>
         {/if}
+      {:else if source === 'relearn'}
+        <p class="prompt-hint relearn">↻ One you just missed — try again.</p>
       {:else}
         <p class="prompt-hint muted">
           {settings.answerMode === 'piano'
@@ -220,28 +335,49 @@
 
     {#if settings.answerMode === 'piano'}
       <Piano
-        onpick={answer}
+        onpick={answerPiano}
         disabled={mode !== 'answering'}
-        {picked}
-        answer={current?.letter ?? null}
+        pickedPc={picked?.pc ?? null}
+        correctPc={current?.pc ?? null}
         revealed={mode === 'feedback'}
       />
     {:else}
-      <div class="pad" role="group" aria-label="Note names">
-        {#each LETTERS as letter}
-          <button
-            type="button"
-            class="key"
-            class:correct={mode === 'feedback' && current?.letter === letter}
-            class:wrong={mode === 'feedback' &&
-              picked === letter &&
-              current?.letter !== letter}
-            disabled={mode !== 'answering'}
-            onclick={() => answer(letter)}
-          >
-            {letter}
-          </button>
-        {/each}
+      <div class="pad-wrap">
+        <div class="accidentals" role="group" aria-label="Accidental">
+          {#each ACCIDENTALS as acc}
+            <button
+              type="button"
+              class="mod"
+              class:active={mode === 'answering' && pendingAcc === acc.value}
+              class:correct={mode === 'feedback' &&
+                current?.accidental === acc.value}
+              aria-pressed={pendingAcc === acc.value}
+              aria-label={acc.label}
+              disabled={mode !== 'answering'}
+              onclick={() => toggleAcc(acc.value)}
+            >
+              {acc.symbol}
+            </button>
+          {/each}
+        </div>
+        <div class="pad" role="group" aria-label="Note names">
+          {#each LETTERS as letter}
+            <button
+              type="button"
+              class="key"
+              class:correct={mode === 'feedback' && current?.letter === letter}
+              class:wrong={mode === 'feedback' &&
+                picked?.letter === letter &&
+                current?.letter !== letter}
+              disabled={mode !== 'answering'}
+              onclick={() => answerLetter(letter)}
+            >
+              {letter}{#if mode === 'answering' && pendingAcc}<span class="key-acc"
+                  >{pendingAcc === '#' ? '♯' : '♭'}</span
+                >{/if}
+            </button>
+          {/each}
+        </div>
       </div>
     {/if}
   {/if}
@@ -315,8 +451,44 @@
   .feedback .bad {
     color: var(--bad);
   }
+  .feedback .relearn {
+    color: var(--accent);
+    font-weight: 600;
+  }
   .feedback.caught {
     gap: 12px;
+  }
+
+  .pad-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  /* Sharp/flat modifiers — staged before a letter, so they read as a toggle
+     rather than an immediate answer. */
+  .accidentals {
+    display: flex;
+    gap: 8px;
+  }
+  .mod {
+    min-height: 48px;
+    min-width: 56px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .mod.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .mod.correct {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--accent-fg);
   }
 
   .pad {
@@ -336,6 +508,14 @@
     min-height: 56px;
     font-size: 1.1rem;
     font-weight: 600;
+  }
+  .key-acc {
+    color: var(--accent);
+    margin-left: 1px;
+  }
+  .key.correct .key-acc,
+  .key.wrong .key-acc {
+    color: inherit;
   }
   .key.correct {
     background: var(--good);
