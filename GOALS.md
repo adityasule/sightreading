@@ -327,15 +327,47 @@ Full design in Design Notes → Learning progression. Decided: major + natural
 minor only; circle-of-fifths order (11 levels, C through 5♯/5♭); minors paired
 onto each level; C-major foundation split by register (on-staff, then ledger);
 a level completes at Leitner box ≥ 2; progression is global across clefs.
-- Define the 11-level scale sequence + per-level note groups (with the
-  register-split foundation) in `music.js`
-- Introduce new cards only from the current level; detect completion at box ≥ 2
-- Explicit "Start [next level]?" gate before unlocking the next level (inline in
-  the quiz, reflected on Home) — one level at a time, no skipping
-- Persist the sequence + current level alongside SR state; migrate pre-M1d
-  progress by mapping introduced cards to their level
-- Surface the current level (e.g. "C major / A minor") + progress in the quiz
-  header and the Home "Today" snapshot
+
+**Approach.** M1d adds a *curriculum layer* on top of the existing deck +
+scheduler — nothing is rewritten. `buildDeck` already emits stable card ids and
+the SR module is already card-agnostic, so the work is to (a) group the deck into
+levels and (b) constrain which fresh cards get introduced. Guiding principle:
+**`spaced-repetition.js` stays generic** — it never learns what a "level" or
+"scale" is (preserves the documented SM-2 swap path). The curriculum lives in
+`music.js`; the scheduler is handed a pre-filtered pool of introducible cards via
+an optional `newPool` param. Built in roughly this order — model first (1–3,
+pure and testable; commit), then UI (4–5; commit), then verify (6).
+
+1. **Curriculum model (`music.js`)** — the keystone, pure/no-UI. Define the
+   12-entry sequence (11 circle-of-fifths levels, with level 1 C major / A minor
+   split into on-staff then ledger sub-levels) and a `levelsFor(deck)` that
+   buckets the *live* deck into ordered level groups. Each card maps to the
+   earliest level that introduces its spelling: naturals → the register-split
+   foundation, each black-key spelling → its home key. Needs an `isOnStaff(card)`
+   register test (expose the currently-private `STAFF_LINES`). Each level carries
+   its display label ("G major / E minor") + key-sig count.
+2. **Scheduler level-awareness (`spaced-repetition.js`)** — add an optional
+   `newPool` param to `pickNext` (due cards still come from the full deck; fresh
+   cards only from the passed pool, default = whole deck so existing callers are
+   unaffected). Add a `boxAtLeast(state, cards, 2)` completion helper (empty
+   group = complete, skip it).
+3. **Progression state + migration** — persist the current level index in the
+   `srt:phase1` blob alongside SR state. On load, migrate pre-M1d progress:
+   current level = first level not yet complete at box ≥ 2 (cards introduced in
+   the old MIDI order fall into their natural levels for free).
+4. **Quiz wiring + gate UI (`Phase1.svelte`)** — derive the current level from
+   the live deck, feed only its un-introduced cards as `newPool`, detect
+   completion → render the inline "Start [next level]?" gate, and surface the
+   current level + per-level progress in the quiz header. Practice mode draws only
+   from introduced cards.
+5. **Home surfacing (`Home.svelte`)** — current level name + progress in the
+   "Today" snapshot.
+6. **Verify** — run the app: a fresh deck, mid-level completion → gate → unlock,
+   and migration against an existing `srt:phase1` blob.
+
+Deciding by default (per "flag only if it should change"): curriculum lives in
+`music.js` (per the design note above), and the scheduler stays generic via the
+`newPool` param rather than learning about levels.
 
 ### Milestone 2 — Engineering polish, PWA & productionization
 Purely engineering-side hardening; no new user-facing features.

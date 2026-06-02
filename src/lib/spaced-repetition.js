@@ -101,12 +101,17 @@ export function dueCards(state, t = now()) {
 }
 
 /**
- * Choose the next card to show from `deck`:
- *   1. the most-overdue introduced card that is due now, else
+ * Choose the next card to show:
+ *   1. the most-overdue introduced card from `deck` that is due now, else
  *   2. a fresh card (introducing it) if today's new-card budget allows, else
  *   3. null — the user is caught up for now.
+ *
+ * Reviews always draw from the full `deck`, but *new* cards are introduced only
+ * from `newPool` (defaults to `deck`). The curriculum passes the current
+ * level's cards here so progression gates which notes get introduced without
+ * the scheduler needing to know what a "level" is.
  */
-export function pickNext(state, deck, newPerDay) {
+export function pickNext(state, deck, newPerDay, newPool = deck) {
   rollDaily(state);
   const ids = new Set(deck.map((c) => c.id));
 
@@ -116,7 +121,7 @@ export function pickNext(state, deck, newPerDay) {
   if (due.length) return due[0][0];
 
   if (state.daily.introduced < newPerDay) {
-    const fresh = deck.find((c) => !state.cards[c.id]);
+    const fresh = newPool.find((c) => !state.cards[c.id]);
     if (fresh) {
       introduce(state, fresh.id);
       return fresh.id;
@@ -124,6 +129,25 @@ export function pickNext(state, deck, newPerDay) {
   }
 
   return null;
+}
+
+/**
+ * How many of `cards` have reached at least Leitner box `minBox`. Un-introduced
+ * cards count as box -1, so they don't count. Drives level-progress readouts
+ * (e.g. "3/4 mastered") and `boxAtLeast` below.
+ */
+export function masteredCount(state, cards, minBox) {
+  return cards.filter((c) => (state.cards[c.id]?.box ?? -1) >= minBox).length;
+}
+
+/**
+ * Has every card in `cards` reached at least Leitner box `minBox`? Used to
+ * detect level completion (box ≥ 2 = answered correctly on two reviews). An
+ * empty group is vacuously complete, so range/clef changes that empty a level
+ * let progression skip past it.
+ */
+export function boxAtLeast(state, cards, minBox) {
+  return masteredCount(state, cards, minBox) === cards.length;
 }
 
 /** Counts for the session header: due now, learned/total, new budget left. */

@@ -136,6 +136,86 @@ export function buildDeck(settings) {
   return deck;
 }
 
+// ── Curriculum: scale-based learning progression (M1d) ──────────────────────
+//
+// New cards are introduced grouped by scale, in circle-of-fifths order, one
+// level at a time. Each level adds the fewest new accidentals (the natural
+// difficulty gradient for a reader). A natural minor shares its relative
+// major's note set, so the two pair onto one level for free — hence the
+// "X major / Y minor" labels. Full rationale in GOALS.md → Design Notes →
+// Learning progression.
+//
+// Level 1 (C major / A minor) is the naturals foundation, large enough to split
+// by register: on-staff naturals first (quick wins), then the harder ledger
+// lines. Levels 2–11 each introduce one black-key spelling in its home key.
+// Each level's `index` is its stable canonical position (0–11), used for
+// persistence and migration; this array is the single source of truth.
+const SEQUENCE = [
+  { key: 'C', label: 'C major / A minor', sub: 'On-staff naturals', foundation: 'onstaff', keySig: 'no sharps or flats' },
+  { key: 'C', label: 'C major / A minor', sub: 'Ledger lines', foundation: 'ledger', keySig: 'no sharps or flats' },
+  { key: 'G', label: 'G major / E minor', newSpelling: 'F#', keySig: '1 sharp' },
+  { key: 'F', label: 'F major / D minor', newSpelling: 'Bb', keySig: '1 flat' },
+  { key: 'D', label: 'D major / B minor', newSpelling: 'C#', keySig: '2 sharps' },
+  { key: 'Bb', label: 'B♭ major / G minor', newSpelling: 'Eb', keySig: '2 flats' },
+  { key: 'A', label: 'A major / F♯ minor', newSpelling: 'G#', keySig: '3 sharps' },
+  { key: 'Eb', label: 'E♭ major / C minor', newSpelling: 'Ab', keySig: '3 flats' },
+  { key: 'E', label: 'E major / C♯ minor', newSpelling: 'D#', keySig: '4 sharps' },
+  { key: 'Ab', label: 'A♭ major / F minor', newSpelling: 'Db', keySig: '4 flats' },
+  { key: 'B', label: 'B major / G♯ minor', newSpelling: 'A#', keySig: '5 sharps' },
+  { key: 'Db', label: 'D♭ major / B♭ minor', newSpelling: 'Gb', keySig: '5 flats' },
+];
+
+/** The ordered scale curriculum, each entry stamped with its canonical index. */
+export const SCALE_SEQUENCE = SEQUENCE.map((lvl, index) => ({ index, ...lvl }));
+
+// Black-key spelling (`letter+accidental`, e.g. "F#") → the level that
+// introduces it, derived from SEQUENCE so the mapping never drifts from it.
+const SPELLING_LEVEL = {};
+for (const lvl of SCALE_SEQUENCE) {
+  if (lvl.newSpelling) SPELLING_LEVEL[lvl.newSpelling] = lvl.index;
+}
+
+/**
+ * Is this card's note within the staff's outer lines (on-staff), as opposed to
+ * out on a ledger line above/below? Drives the foundation's register split and
+ * the on-staff-before-ledger introduction order within every level.
+ */
+export function isOnStaff(card) {
+  const { bottom, top } = STAFF_LINES[card.clef];
+  return card.midi >= bottom && card.midi <= top;
+}
+
+// The canonical level index a card belongs to: naturals go to the foundation
+// (split by register), each black-key spelling to its home key.
+function levelIndexFor(card) {
+  if (card.accidental === '') return isOnStaff(card) ? 0 : 1;
+  return SPELLING_LEVEL[card.letter + card.accidental];
+}
+
+/**
+ * Bucket a live deck into its ordered scale levels. Returns only the levels
+ * that have at least one in-range card (so narrowing the range or disabling a
+ * clef simply drops the levels that lose all their cards), each carrying its
+ * `SCALE_SEQUENCE` metadata plus a `cards` array sorted on-staff-then-pitch —
+ * the order new cards are introduced within the level.
+ */
+export function levelsFor(deck) {
+  const byIndex = new Map();
+  for (const card of deck) {
+    const idx = levelIndexFor(card);
+    if (!byIndex.has(idx)) byIndex.set(idx, []);
+    byIndex.get(idx).push(card);
+  }
+  const levels = [];
+  for (const meta of SCALE_SEQUENCE) {
+    const cards = byIndex.get(meta.index);
+    if (!cards || cards.length === 0) continue;
+    cards.sort((a, b) => isOnStaff(b) - isOnStaff(a) || a.midi - b.midi);
+    levels.push({ ...meta, cards });
+  }
+  return levels;
+}
+
 /** The seven note-name buttons, in alphabetical order. */
 export const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 
