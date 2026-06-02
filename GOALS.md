@@ -43,6 +43,31 @@ browser. (Future option: opt-in export/import a JSON blob.)
 
 ## Phases
 
+### Phase 0 — Basics (new feature — M2)
+A gentle, multiple-choice on-ramp *before* note recall. Where Phase 1 is recall
+(Letters/Piano) with ledger lines, accidentals and scale progression, Phase 0 is
+recognition: multiple choice, on-staff only, absolute-beginner.
+
+**In scope**
+- **Note-name cards** — render one on-staff note; user picks its letter name from
+  multiple choice. On-staff notes only (no ledger lines) **except middle C**,
+  which anchors the very start (see Design Notes → Middle C anchor).
+- **Note time-value cards** — render a single note of a given duration; user
+  picks the duration name. Coverage: sixteenth → double whole (6 values).
+- **Rest time-value cards** — render a rest glyph; user picks its duration name.
+  Same 6 values.
+- **Clef-symbol cards** — render a lone clef; user identifies treble vs bass.
+  (The only Basics cards that show a clef in isolation.)
+- All answers are **multiple choice**.
+- **Naming-convention setting** — British or American duration names, **default
+  British** (see the table in Design Notes). Affects duration + rest cards only.
+- Reuses the generic Leitner scheduler. Route id `phase0`, storage `srt:phase0`,
+  user-facing name **Basics**.
+
+**Out of scope (Phase 0)**
+- Ledger-line notes beyond the middle-C anchor, accidentals, dotted/tied
+  durations, time signatures, and recall/typed input (that is Phase 1).
+
 ### Phase 1 — Single notes, treble & bass clef ✅ shipped
 Single-note reading on both clefs, naturals + accidentals, Letters/Piano answer
 modes, configurable range, Leitner SR, and scale-based curriculum progression.
@@ -97,10 +122,11 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 
 ### UI
 - Single-page app, view-switching driven by simple state (no router lib in v1).
-- Views: Home/Today, Notation, Chords, Key Signatures, Settings.
-- **User-facing names vs. internal ids.** "Phase 1/2/3" is developer shorthand
+- Views: Home/Today, Basics, Notation, Chords, Key Signatures, Progress, Settings.
+- **User-facing names vs. internal ids.** "Phase 0/1/2/3" is developer shorthand
   and must never appear in the UI. The user sees musical names; the code keeps
   the short route ids (single source of truth in `src/lib/phases.js`):
+  - Phase 0 → **Basics** (route id `phase0`, storage key `srt:phase0`)
   - Phase 1 → **Notation** (route id `phase1`, storage key `srt:phase1`)
   - Phase 2 → **Chords** (route id `phase2`)
   - Phase 3 → **Key Signatures** (route id `phase3`)
@@ -113,8 +139,52 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 ### Music rendering
 - VexFlow renders to SVG. Minimal — no time signatures, no measure bars.
 - Single staff: one note (Phase 1) or 3 stacked notes (Phase 2).
+- Phase 0 also renders, in isolation: a lone clef (clef-symbol cards), a single
+  note of a given duration (note time-value cards), and a rest glyph (rest
+  time-value cards).
 - **Font race:** await `VexFlow.loadFonts('Bravura', 'Academico')` before the
   first render, or glyph metrics are wrong on first paint (see M1c in HISTORY).
+
+### Phase 0 — Basics (design)
+- **Answer input:** a reusable multiple-choice component (4 options, one
+  correct), distinct from the Phase 1 Letters/Piano pads. Touch-friendly, 44px
+  targets, keyboard-selectable on desktop.
+- **Card types** share one `srt:phase0` deck through the generic scheduler:
+  note-name, note-duration, rest-duration, clef-symbol. Each card carries its
+  type so the renderer and the option set can branch.
+- **On-staff only** for note-name cards (no ledger lines), except the middle-C
+  anchor — keeps Phase 0 the gentle on-ramp; ledger reading lives in Phase 1.
+- **Duration naming** honours the British/American setting (default British):
+
+  | American          | British      |
+  |-------------------|--------------|
+  | double whole note | breve        |
+  | whole note        | semibreve    |
+  | half note         | minim        |
+  | quarter note      | crotchet     |
+  | eighth note       | quaver       |
+  | sixteenth note    | semiquaver   |
+
+  Rests use the same names with "rest" appended. The setting changes both the
+  prompt copy and the multiple-choice option labels; it does not change which
+  cards exist or how they're scheduled.
+
+### Middle C anchor (cluster-first)
+"Start at the very beginning with middle C" reinforces middle C as the reading
+reference. Middle C is a *ledger* note on both clefs, which would normally be
+deferred by the on-staff-first ordering — so it is an explicit exception. In
+both Phase 0 note-name cards and Phase 1's foundation level, middle C plus its
+immediate on-staff neighbours (the B3/D4 region) are introduced as the **first
+small cluster**, overriding on-staff-first for that cluster only; the rest of the
+on-staff naturals follow, then ledger lines as before.
+
+### Progress view
+A dedicated nav view (route id `progress`) showing progress across every phase,
+read from each phase's `srt:phaseN` blob (no new persistence). A completion bar
+per phase. The **Notation** phase shows **two** bars — scale-level progression
+and individual-note mastery — since it carries both dimensions. Phases not yet
+built (Chords, Key Signatures) show as locked/empty; Chords gains its own bar
+split when it ships in M4.
 
 ### Cost & rate-limit safeguards
 - No backend in v1 — primary defense. No third-party APIs called at runtime.
@@ -130,23 +200,58 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 > ✅ **Milestones 0 – 1d complete** (Phase 1 / Notation shipped). See
 > [HISTORY.md](./HISTORY.md).
 
-### Milestone 2 — Engineering polish, PWA & productionization
-Purely engineering-side hardening; no new user-facing features.
-- Web app manifest + service worker for offline use (PWA)
-- Performance budget verification against the NFRs (<200KB initial JS, <1s TTI
-  on 4G) — code-split audit, confirm VexFlow stays lazy-loaded
-- Asset/build optimization (caching headers, hashing) and a production error
-  boundary so a render failure never blanks the app
+### Milestone 2 — Basics phase, progress view, polish & productionization
+Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
+the engineering hardening to ship publicly. Sequenced **feature / bugfix /
+cleanup first, productionization last**, in small submilestones.
+
+**M2a — Test harness + code review & simplify** *(cleanup/bugfix, base first)*
+- Add **Vitest** (dev-only, never shipped) and unit-test the pure-logic modules:
+  `music.js`, `spaced-repetition.js`, `progression.js` (range math, deck build,
+  scheduler/migration, level bucketing). Document `npm test` in README + CLAUDE.md.
+- General code review for bugs; apply simplifications surfaced by writing the
+  tests. Tidy small dups (e.g. the `.muted` style repeated in the Phase 2/3
+  placeholder views). Tests become the safety net for everything after.
+
+**M2b — Middle C anchor (cluster-first)**
+- Curriculum tweak in `music.js`: middle C + its immediate on-staff neighbours
+  introduce as the first cluster of the foundation, overriding on-staff-first for
+  that cluster only. Covered by the M2a tests.
+
+**M2c — Basics phase scaffold + note-name cards** *(Phase 0, part 1)*
+- New `Basics` view (route id `phase0`, storage `srt:phase0`); `phases.js`
+  `phase0` entry; nav + Home surfacing.
+- Reusable multiple-choice answer component (4 options).
+- First card type: note-name recognition (on-staff only + middle-C anchor),
+  reusing the generic scheduler.
+- Naming-convention setting (British default) added to Settings (used in M2d).
+
+**M2d — Basics phase: durations, rests & clef cards** *(Phase 0, part 2)*
+- Note time-value and rest time-value cards (sixteenth → double whole), VexFlow
+  rendering of duration/rest glyphs; option labels honour British/American.
+- Clef-symbol cards (lone treble/bass clef).
+
+**M2e — Progress view**
+- New `Progress` view + route, completion bar per phase read from each
+  `srt:phaseN` blob. Notation shows two bars (scale-level progression + note
+  mastery). Unbuilt phases show locked/empty.
+
+**M2f — Engineering hardening & PWA** *(productionization)*
+- Web app manifest + service worker for offline use (PWA).
+- Performance budget vs the NFRs (<200KB initial JS, <1s TTI on 4G) — code-split
+  audit, confirm VexFlow stays lazy-loaded.
+- Asset/build optimization (caching headers, hashing) + a production error
+  boundary so a render failure never blanks the app.
 - localStorage robustness — versioned state blob + safe migration/fallback
-- **Publish to GitHub as a public open-source repo:**
-  - *Licensing* — add an OSS license (e.g. MIT) + the year/owner line
-  - *Privacy* — audit the repo so it leaks no personal developer info beyond
-    what GitHub inherently exposes: scrub author name/email in commit history
-    and config as desired, the README's machine-specific hostnames/IPs, the
-    `.idea/` and any local paths, and `userEmail`-type data
-  - *Secrets* — ensure no production secrets are committed or in history;
-    confirm `.gitignore` covers env/secret files and that the static app
-    genuinely ships none (consistent with the no-backend architecture)
+  (covering all of `srt:phase0/1` and settings).
+
+**M2g — Publish as OSS**
+- *Licensing* — add an OSS license (e.g. MIT) + the year/owner line.
+- *Privacy* — scrub personal developer info beyond what GitHub inherently
+  exposes: author name/email in commit history and config, the README's
+  machine-specific hostnames/IPs, `.idea/` and local paths, `userEmail`-type data.
+- *Secrets* — ensure no secrets are committed or in history; confirm
+  `.gitignore` covers env/secret files and the static app genuinely ships none.
 
 ### Milestone 3 — First production deploy
 - Create Cloudflare Pages project, connect to git
@@ -169,3 +274,19 @@ Purely engineering-side hardening; no new user-facing features.
   Recommendation: subdomain — cleaner separation from anything else hosted on
   the apex, easier to rebuild or retire independently.
 - **VexFlow version pin**: pinned to `^5.0.0` for now; revisit on each minor bump.
+
+### Resolved (2026-06-02, Milestone 2 planning)
+- **Phase 0 name** → **Basics** (route id `phase0`, storage `srt:phase0`).
+- **"Phase 2 progress bars for scales/notes"** → meant the **Notation** phase;
+  it gets two bars (scale-level progression + note mastery).
+- **Testing** → add **Vitest** for the pure-logic modules only (M2a); UI stays
+  manual-verify. Dev-only, so the no-backend constraint is untouched.
+- **Middle C** → **anchor cluster first**: middle C + immediate on-staff
+  neighbours introduce before the rest of the on-staff naturals, in both Phase 0
+  and Phase 1's foundation.
+- **80 cards (not 88)** → the deck is notes within ±`ledgerLines` of each staff
+  per enabled clef, with 2 spellings per black key — not the 88-key board. 80 is
+  the default-range total; it scales with the range setting.
+- **Same pitch on two clefs** → kept as distinct cards (`treble:60` vs
+  `bass:60`) — different visual skill; level completion already treats the pitch
+  class as one skill across clefs.
