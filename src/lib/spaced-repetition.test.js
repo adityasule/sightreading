@@ -263,4 +263,35 @@ describe('loadState / saveState (localStorage round-trip)', () => {
     expect(loaded.daily.day).toBe(dayKey());
     expect(loaded.daily.introduced).toBe(0);
   });
+
+  it('stamps the schema version on save', () => {
+    const s = freshState();
+    saveState('srt:test', s);
+    expect(JSON.parse(localStorage.getItem('srt:test')).version).toBe(1);
+  });
+
+  it('falls back to defaults for a blob from a newer app version', () => {
+    localStorage.setItem(
+      'srt:test',
+      JSON.stringify({ version: 999, cards: { a: { box: 4, dueAt: 0 } } })
+    );
+    expect(loadState('srt:test').cards).toEqual({}); // reset, not half-read
+  });
+
+  it('falls back to defaults for a non-object blob', () => {
+    localStorage.setItem('srt:test', '42');
+    expect(loadState('srt:test').cards).toEqual({});
+    localStorage.setItem('srt:test', '[1,2,3]');
+    expect(loadState('srt:test').cards).toEqual({});
+  });
+
+  it('migrates an unversioned legacy blob forward, preserving cards', () => {
+    localStorage.setItem(
+      'srt:test',
+      JSON.stringify({ cards: { a: { box: 2, dueAt: 0 } } })
+    );
+    const loaded = loadState('srt:test');
+    expect(loaded.cards.a.box).toBe(2); // progress kept
+    expect(loaded.version).toBe(1); // stamped to current
+  });
 });

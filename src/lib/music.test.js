@@ -199,6 +199,23 @@ describe('SCALE_SEQUENCE + levelsFor — curriculum bucketing', () => {
       }
     }
   });
+
+  it('interleaves clefs when introducing, not one whole clef first (M2f)', () => {
+    const cards = levelsFor(buildDeck({ treble: true, bass: true, ledgerLines: 2 }))
+      .find((l) => l.index === 0).cards;
+    // After the anchor cluster, the on-staff naturals should fan out across both
+    // clefs (bass MIDI all sorts below treble, so a plain pitch sort used to
+    // serve every bass note before any treble).
+    const onStaff = cards.filter((c) => !isAnchor(c) && isOnStaff(c));
+    const clefs = onStaff.map((c) => c.clef);
+    // Both clefs show up in the first handful — no all-bass-then-all-treble run.
+    expect(new Set(clefs.slice(0, 4))).toEqual(new Set(['treble', 'bass']));
+    // Equal on-staff counts per clef → strict alternation (no two adjacent same).
+    expect(clefs.every((c, i) => i === 0 || c !== clefs[i - 1])).toBe(true);
+    // The anchor cluster itself also alternates clefs (middle C on each clef first).
+    expect(cards.slice(0, 2).map((c) => c.clef)).toEqual(['treble', 'bass']);
+    expect(cards.slice(0, 2).map((c) => c.midi)).toEqual([60, 60]);
+  });
 });
 
 describe('Middle C anchor (cluster-first)', () => {

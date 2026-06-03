@@ -205,6 +205,54 @@ function anchorRank(card) {
   return isAnchor(card) ? Math.abs(card.midi - 60) : 100;
 }
 
+// Introduction tiers, the coarse order new cards are learned in: the anchor
+// cluster first, then on-staff naturals/spellings, then ledger lines. This is
+// the primary ordering key, so anchor-first and on-staff-before-ledger hold
+// *across* clefs (not just within one).
+function tierOf(card) {
+  if (isAnchor(card)) return 0;
+  return isOnStaff(card) ? 1 : 2;
+}
+
+// Deterministic clef order for the round-robin tiebreak (treble leads a round).
+const CLEF_ORDER = { treble: 0, bass: 1 };
+
+/**
+ * Order a level's cards for introduction: anchor → on-staff → ledger, but with
+ * a clef round-robin *within* each tier so new cards fan out across the enabled
+ * clefs instead of serving one whole clef first (the M2f fix — bass MIDI all
+ * sorts below treble, so a plain midi sort introduced every bass note before
+ * any treble). Pure and deterministic (no shuffle), so the order is stable
+ * across calls. Single-clef decks are unaffected — the clef tiebreak is a no-op.
+ */
+function orderForIntroduction(cards) {
+  // The teaching order *within* one clef's slice of a tier: anchor cluster
+  // (middle C leading), then by pitch.
+  const within = (a, b) => anchorRank(a) - anchorRank(b) || a.midi - b.midi;
+
+  // Rank each card within its (tier, clef) group, so round r of the round-robin
+  // is every clef's r-th card in that tier.
+  const groups = new Map();
+  for (const card of cards) {
+    const key = `${tierOf(card)}:${card.clef}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(card);
+  }
+  const rank = new Map();
+  for (const group of groups.values()) {
+    group.sort(within);
+    group.forEach((card, i) => rank.set(card, i));
+  }
+
+  return [...cards].sort(
+    (a, b) =>
+      tierOf(a) - tierOf(b) || // anchor, then on-staff, then ledger (across clefs)
+      rank.get(a) - rank.get(b) || // round number — interleaves the clefs
+      (CLEF_ORDER[a.clef] ?? 99) - (CLEF_ORDER[b.clef] ?? 99) || // treble before bass
+      a.midi - b.midi // stable final tiebreak
+  );
+}
+
 // The canonical level index a card belongs to: naturals go to the foundation
 // (split by register, but the anchor cluster joins the on-staff sub-level even
 // though it is on ledger lines), each black-key spelling to its home key.
@@ -217,10 +265,10 @@ function levelIndexFor(card) {
  * Bucket a live deck into its ordered scale levels. Returns only the levels
  * that have at least one in-range card (so narrowing the range or disabling a
  * clef simply drops the levels that lose all their cards), each carrying its
- * `SCALE_SEQUENCE` metadata plus a `cards` array sorted anchor-then-on-staff-
- * then-pitch — the order new cards are introduced within the level. The anchor
- * cluster only ever lands in the foundation (level 0), so the extra key is a
- * no-op everywhere else.
+ * `SCALE_SEQUENCE` metadata plus a `cards` array in introduction order —
+ * anchor-then-on-staff-then-ledger, with a clef round-robin within each tier
+ * (see `orderForIntroduction`). The anchor cluster only ever lands in the
+ * foundation (level 0).
  */
 export function levelsFor(deck) {
   const byIndex = new Map();
@@ -233,11 +281,7 @@ export function levelsFor(deck) {
   for (const meta of SCALE_SEQUENCE) {
     const cards = byIndex.get(meta.index);
     if (!cards || cards.length === 0) continue;
-    cards.sort(
-      (a, b) =>
-        anchorRank(a) - anchorRank(b) || isOnStaff(b) - isOnStaff(a) || a.midi - b.midi
-    );
-    levels.push({ ...meta, cards });
+    levels.push({ ...meta, cards: orderForIntroduction(cards) });
   }
   return levels;
 }

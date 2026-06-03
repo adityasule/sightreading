@@ -30,11 +30,12 @@
   let session = $state({ seen: 0, correct: 0 });
   let counts = $state({ due: 0, learned: 0, total: 0, newRemaining: 0 });
 
-  // Manual deck top-up (M2e): once the user opts to bypass the daily new-card
-  // cap, new cards flow uncapped for the rest of the session (resets on remount).
-  // Basics has no levels, so the top-up is just this cap bypass; `deckHasNew` is
+  // Manual deck top-up (M2e, batched in M2f): each "add more" click grants one
+  // extra batch of `newCardsPerDay` cards on top of the daily budget — never an
+  // unlimited bypass, so the setting stays a hard cap. Session-scoped (resets on
+  // remount). Basics has no levels, so the top-up is just this; `deckHasNew` is
   // true while the finite deck still holds un-introduced cards.
-  let bypassCap = $state(false);
+  let extraBatches = $state(0);
   let deckHasNew = $derived(counts.learned < counts.total);
 
   let advanceTimer = null;
@@ -105,9 +106,9 @@
     }
 
     // 2. The normal scheduler: a due card, else a fresh one (deck order, so the
-    //    common durations lead), capped by the daily new-card budget — unless the
-    //    user has opted to bypass the cap for this session.
-    const budget = bypassCap ? Infinity : settings.newCardsPerDay;
+    //    common durations lead), capped by the daily new-card budget — each
+    //    opted-in top-up batch lifts it by one more `newCardsPerDay`.
+    const budget = settings.newCardsPerDay * (1 + extraBatches);
     const id = srs.pickNext(srsState, deck, budget);
     srs.saveState(STORAGE_KEY, srsState); // persist a newly-introduced card
     refreshCounts();
@@ -133,10 +134,10 @@
     showCard(introduced[Math.floor(Math.random() * introduced.length)], 'practice');
   }
 
-  // Manual cap bypass (M2e): opt out of the daily new-card limit for this
-  // session, then serve the next new card immediately.
+  // Manual top-up (M2e): grant one more batch of new cards past today's budget,
+  // then serve the next one immediately.
   function addMoreCards() {
-    bypassCap = true;
+    extraBatches += 1;
     next();
   }
 

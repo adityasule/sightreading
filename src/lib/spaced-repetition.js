@@ -15,6 +15,12 @@ const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Persisted-blob schema version. Stamped on every save; checked on load so a
+// blob written by a *newer* app (version > this) falls back to defaults rather
+// than being half-read and corrupted. Bump this when the shape changes in a way
+// older builds can't safely read, and add a migration in `loadState`.
+const STATE_VERSION = 1;
+
 function now() {
   return Date.now();
 }
@@ -36,7 +42,7 @@ function dayKeyAgo(n) {
 }
 
 function emptyState() {
-  return { cards: {}, daily: { day: dayKey(), introduced: 0 } };
+  return { version: STATE_VERSION, cards: {}, daily: { day: dayKey(), introduced: 0 } };
 }
 
 /** Reset the new-card counter when the calendar day rolls over. */
@@ -54,7 +60,15 @@ export function loadState(storageKey) {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return emptyState();
     const state = JSON.parse(raw);
-    if (!state.cards) state.cards = {};
+    // Defend against anything that isn't a plain object (corrupt / hand-edited),
+    // or a blob from a newer app we can't understand — reset to defaults rather
+    // than risk a half-read, throwing state. A missing version is a pre-M2f blob.
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return emptyState();
+    if (typeof state.version === 'number' && state.version > STATE_VERSION) {
+      return emptyState();
+    }
+    if (!state.cards || typeof state.cards !== 'object') state.cards = {};
+    state.version = STATE_VERSION; // stamp / migrate an unversioned blob forward
     rollDaily(state); // normalize older blobs that predate the daily budget
     return state;
   } catch {
@@ -63,6 +77,7 @@ export function loadState(storageKey) {
 }
 
 export function saveState(storageKey, state) {
+  state.version = STATE_VERSION;
   localStorage.setItem(storageKey, JSON.stringify(state));
 }
 

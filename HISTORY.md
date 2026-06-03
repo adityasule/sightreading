@@ -236,6 +236,48 @@ escape hatch for the two "no new cards left" dead-ends.
   (current stays put, `canAdvance` false) and the early advance (current/pool move
   to the next level once it's unlocked).
 
+### Milestone 2f — Engineering hardening & carryover bug fixes ✅
+The productionization slice of Milestone 2: two carryover bugs the M2e top-up
+surfaced, then robustness hardening for a public deploy. No new user-facing
+features. (Caching headers deferred to M3; the PWA, music-font self-hosting and
+the CDP helper to M4 — offline waits until after the first deploy.)
+- **Per-batch cap, not an unlimited bypass (`Phase1.svelte`, `Phase0.svelte`).**
+  The M2e "Add more" top-up set a `bypassCap` flag that fed `pickNext` an
+  `Infinity` new-card budget — one click uncapped new cards for the whole session.
+  Replaced with a session-scoped `extraBatches` counter; the effective budget is
+  `newCardsPerDay × (1 + extraBatches)`, so each click grants exactly one more
+  batch of the daily size and the setting stays a hard cap (the daily counter
+  still resets at local midnight). The `newCardsPerDay` key/label were kept (the
+  daily cap is still the primary meaning); the Settings helper text now notes the
+  top-up draws a batch of this size.
+- **New cards fan out across clefs (`music.js`).** `levelsFor` ended its per-level
+  sort on `a.midi - b.midi`; since bass MIDI (43–57) all sorts below treble
+  (64–77), the foundation introduced *every* bass on-staff natural before any
+  treble (both clefs on by default → out of the box). Replaced the inline sort
+  with `orderForIntroduction`: a deterministic clef round-robin within each
+  introduction tier (`tierOf`: anchor → on-staff → ledger), ranking each card in
+  its (tier, clef) group and interleaving by round number then a fixed clef order.
+  Anchor-first and on-staff-before-ledger still hold across clefs; pure and stable
+  across calls (no shuffle); single-clef decks unaffected.
+- **Versioned, fault-tolerant persistence (`spaced-repetition.js`,
+  `settings.svelte.js`).** Every blob (`srt:phase0`/`srt:phase1`, `srt:settings`)
+  is stamped with a schema `version` on save. On load, a non-object/array, a blob
+  from a newer app (`version` greater than current), or corrupt JSON falls back to
+  defaults instead of throwing or half-reading; an unversioned legacy blob migrates
+  forward with progress intact. Settings keeps `version` on disk only, out of the
+  reactive object.
+- **Production error boundary (`App.svelte`).** The active view is wrapped in
+  Svelte 5's `<svelte:boundary>` with a "Try again" fallback, so a render throw
+  (e.g. a VexFlow failure) no longer blanks the app — the header + nav stay live to
+  navigate away. Wraps only the view, not the shell.
+- **Performance budget — confirmed, no change.** Audit only: VexFlow stays a
+  separate dynamic-`import('vexflow')` chunk (~691KB gz) loaded only when a quiz
+  opens; the initial entry chunk is ~32KB gz, far under the <200KB initial-JS NFR.
+  No static VexFlow import in `src`.
+- 88 unit tests (up from 83): the clef round-robin interleave case, plus four
+  persistence-robustness cases (version stamping, future-version and non-object
+  fallback, legacy migration).
+
 ---
 
 ## Resolved design notes

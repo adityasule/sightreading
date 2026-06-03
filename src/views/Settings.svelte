@@ -111,7 +111,10 @@
   <section class="card setting">
     <div class="setting-text">
       <h3>New cards per day</h3>
-      <p class="muted">How many unseen notes to introduce each day.</p>
+      <p class="muted">
+        How many unseen cards to introduce each day. "Add more" tops up by this
+        many at a time.
+      </p>
     </div>
     <div class="stepper" role="group" aria-label="New cards per day">
       <button

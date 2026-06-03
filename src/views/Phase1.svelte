@@ -38,11 +38,13 @@
   // Progression view (current level, per-level progress, gate). See progression.js.
   let level = $state(null);
 
-  // Manual deck top-up (M2e): once the user opts to bypass the daily new-card
-  // cap, new cards flow uncapped for the rest of the session (resets on remount).
-  let bypassCap = $state(false);
+  // Manual deck top-up (M2e, batched in M2f): each "add more" click grants one
+  // extra batch of `newCardsPerDay` cards on top of the daily budget — never an
+  // unlimited bypass, so the setting stays a hard cap. Session-scoped (resets on
+  // remount); the daily counter still resets at local midnight.
+  let extraBatches = $state(0);
   // Caught-up: does the current level still have un-introduced cards? True means a
-  // budget-limited dead-end (offer the cap bypass); false once the level pool is
+  // budget-limited dead-end (offer another batch); false once the level pool is
   // exhausted (offer the early next-level advance instead).
   let poolHasNew = $derived(!!level && level.pool.some((c) => !srsState.cards[c.id]));
 
@@ -112,10 +114,10 @@
     }
 
     // 2. The normal scheduler: a due card, or a fresh one from the current
-    //    level only (progression gates which notes are introducible). The cap
-    //    bypass lifts the daily new-card budget once the user opts in.
+    //    level only (progression gates which notes are introducible). Each
+    //    opted-in top-up batch lifts the daily budget by one `newCardsPerDay`.
     const view = progress(srsState, deck);
-    const budget = bypassCap ? Infinity : settings.newCardsPerDay;
+    const budget = settings.newCardsPerDay * (1 + extraBatches);
     const id = srs.pickNext(srsState, deck, budget, view.pool);
     srs.saveState(STORAGE_KEY, srsState); // persist newly-introduced card / migration
     refreshCounts();
@@ -155,10 +157,10 @@
     next();
   }
 
-  // Manual cap bypass (M2e): opt out of the daily new-card limit for this
-  // session, then serve the next new card immediately.
+  // Manual top-up (M2e): grant one more batch of new cards past today's budget,
+  // then serve the next one immediately.
   function addMoreCards() {
-    bypassCap = true;
+    extraBatches += 1;
     next();
   }
 

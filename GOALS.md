@@ -221,45 +221,7 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2e — Progress view & manual deck top-up** ✅ shipped — see HISTORY.md.
 
-**M2f — Engineering hardening, bug fixes & PWA** *(productionization)*
-- Web app manifest + service worker for offline use (PWA).
-- Performance budget vs the NFRs (<200KB initial JS, <1s TTI on 4G) — code-split
-  audit, confirm VexFlow stays lazy-loaded.
-- Asset/build optimization (caching headers, hashing) + a production error
-  boundary so a render failure never blanks the app.
-- localStorage robustness — versioned state blob + safe migration/fallback
-  (covering all of `srt:phase0/1` and settings).
-- **Dev tooling — committed CDP helper.** Promote the throwaway headless-Chrome /
-  CDP script used to smoke-test M2e into a small, committed dev-only helper (e.g.
-  `scripts/drive.mjs`, beside the `render` script): a reusable connect → seed
-  `localStorage` → click-by-text → screenshot / eval API over the installed
-  Chrome. No new heavyweight deps (Node's global `WebSocket`); the browser stays
-  the source of truth for UI checks. (Considered Playwright — rejected the
-  browser-binary weight + a standing e2e suite as a mismatch with the project's
-  "verify manually, no UI tests" stance; revisit `playwright-core` only if a
-  regression suite is later wanted.)
-- **Bug fixes (carryover):**
-  - *Cap bypass should honour a per-batch cap, not go unlimited.* The M2e "Add
-    more new notes/cards" top-up sets `bypassCap = true`, which makes `next()`
-    pass `Infinity` as the new-card budget — so one click introduces *unlimited*
-    new cards for the rest of the session. Correct behaviour: each top-up grants
-    at most one more batch of `newCardsPerDay` cards (bump the effective budget by
-    `newCardsPerDay` per click via a counter, never `Infinity`), keeping the
-    setting a hard cap. Fix in both quizzes — `Phase1.svelte` *and* `Phase0.svelte`
-    share the pattern. Consider renaming `newCardsPerDay` (settings store +
-    Settings tab + `QuizSettings`) to reflect it's now also the batch size, e.g.
-    "New cards per batch".
-  - *Spread new-card introduction across clefs, not one whole clef first.* New
-    cards are introduced in `levelsFor`'s sorted `cards` order (`music.js`), whose
-    tail key is `a.midi - b.midi`. The foundation level holds both clefs' on-staff
-    naturals, so after the middle-C anchor it serves *all* bass on-staff naturals
-    (MIDI 43–57) before any treble (64–77) — one clef at a time. Correct
-    behaviour: interleave / fan out introduction across the enabled clefs and the
-    register so new cards alternate treble/bass and spread evenly. Recommended a
-    deterministic clef round-robin within each tier (preserve anchor-first and
-    on-staff-before-ledger) over a true shuffle, which would make "next card"
-    nondeterministic across `levelsFor` calls. Phase 1 only; update the M2a
-    `music.test.js` ordering expectations.
+**M2f — Engineering hardening & carryover bug fixes** ✅ shipped — see HISTORY.md.
 
 **M2g — Publish as OSS**
 - *Licensing* — add an OSS license (e.g. MIT) + the year/owner line.
@@ -272,9 +234,44 @@ cleanup first, productionization last**, in small submilestones.
 ### Milestone 3 — First production deploy
 - Create Cloudflare Pages project, connect to git
 - Configure custom domain (see Open Questions)
+- **Cache headers** via a Cloudflare Pages `_headers` file — long-lived immutable
+  caching for Vite's content-hashed assets, `no-cache` for `index.html` so deploys
+  propagate (extend the `no-cache` rule to the service worker once M4's PWA ships).
+  *Moved here from M2f: the headers can only be set and verified once the Pages
+  project serves the site.*
 - Verify HTTPS, run Lighthouse, ensure score >90 across the board
 
-### Milestone 4 — Phase 2 (chords)
+### Milestone 4 — Phase 2 (chords) + carried-over tasks
+- **Phase 2 (chords)** — the feature; full scope under Phases → Phase 2 above.
+- **Self-host the music font** *(moved from M2f; offline prerequisite).* The app
+  dynamic-imports the default `vexflow` build, which fetches the Bravura music font
+  from a third-party CDN mid-render (root cause of the M1c first-paint bug) — a
+  runtime third-party call at odds with the no-runtime-API constraint, *and* the
+  reason note rendering breaks offline (the `loadFonts` catch blocks in
+  `Phase0.svelte`/`Phase1.svelte` already degrade to wrong glyph metrics when the
+  fetch fails). Switch to the font-bundled build (`vexflow/bravura`, which
+  `scripts/render.mjs` already uses) or self-host the woff2, so no glyph asset is
+  fetched at runtime. The font weight lands in the already-lazy VexFlow chunk, not
+  the initial bundle, so the <200KB initial-JS budget is unaffected. Until this
+  lands the deployed app fetches the font from a CDN (fine online, broken offline)
+  — acceptable through M3, since offline isn't considered until after the first
+  deploy. **Prerequisite for the PWA task below.**
+- **PWA (manifest + service worker)** *(moved from M2f; nice-to-have per NFRs, not
+  blocking).* Web app manifest + a service worker that precaches the app shell and
+  the lazy VexFlow chunk for offline use. Relies on the font self-hosting task
+  above (no runtime CDN fetch), so offline is genuinely offline by the time this
+  lands. Keep the worker conservative about staleness (versioned precache or
+  network-first for the HTML) so a deploy is never pinned by a stale cached worker.
+- **Dev tooling — committed CDP helper** *(moved from M2f; independent of feature
+  work).* Promote the throwaway headless-Chrome / CDP script used to smoke-test M2e
+  into a small, committed dev-only helper (e.g. `scripts/drive.mjs`, beside the
+  `render` script): a reusable connect → seed `localStorage` → click-by-text →
+  screenshot / eval API over the installed Chrome. No new heavyweight deps (Node's
+  global `WebSocket`); the browser stays the source of truth for UI checks.
+  (Considered Playwright — rejected the browser-binary weight + a standing e2e
+  suite as a mismatch with the project's "verify manually, no UI tests" stance;
+  revisit `playwright-core` only if a regression suite is later wanted.)
+
 ### Milestone 5 — Phase 3 (key signatures)
 
 ### Future ideas (not committed)

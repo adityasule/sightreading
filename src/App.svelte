@@ -85,7 +85,22 @@
   </nav>
 
   <main>
-    <ActiveComponent />
+    <!-- Production error boundary: a render throw (e.g. a VexFlow failure) shows
+         a fallback instead of blanking the whole app. Wraps only the active view
+         so the header + nav stay live to navigate away or retry. -->
+    <svelte:boundary onerror={(e) => console.error(e)}>
+      <ActiveComponent />
+
+      {#snippet failed(error, reset)}
+        <div class="boundary">
+          <h2>Something went wrong</h2>
+          <p class="muted">
+            This view hit an error. Try again, or pick another section from the menu.
+          </p>
+          <button type="button" class="btn-primary" onclick={reset}>Try again</button>
+        </div>
+      {/snippet}
+    </svelte:boundary>
   </main>
 </div>
 
@@ -160,6 +175,23 @@
   main {
     padding: 24px 20px;
     min-height: 0;
+  }
+
+  /* Error-boundary fallback — centered, calm, with a retry. */
+  .boundary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+    padding: 40px 16px;
+  }
+  .boundary h2 {
+    margin: 0;
+  }
+  .boundary p {
+    margin: 0;
+    max-width: 36ch;
   }
 
   /* Backdrop behind the open drawer. */
