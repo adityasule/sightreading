@@ -226,10 +226,11 @@ split when it ships in M5.
 
 ## Productionization Plan
 
-> ✅ **Milestones 0 – 4 complete** — Phase 1 (Notation) and Phase 0 (Basics)
-> shipped, plus the progress view, productionization hardening, the OSS publish
-> prep, and the first production deploy (Cloudflare Workers, live at
-> `sightreading.adityasule.com`). See [HISTORY.md](./HISTORY.md).
+> ✅ **Milestones 0 – 5 complete** — Phase 1 (Notation), Phase 0 (Basics) and
+> Phase 2 (Chords) shipped, plus the progress view, productionization hardening,
+> the OSS publish prep, the first production deploy (Cloudflare Workers, live at
+> `sightreading.adityasule.com`), the music-font self-hosting, the contrast a11y
+> fix, and the committed CDP dev helper. See [HISTORY.md](./HISTORY.md).
 
 ### Milestone 2 — Basics phase, progress view, polish & productionization ✅ complete
 Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
@@ -264,46 +265,27 @@ integration) at `sightreading.adityasule.com`; `public/_headers` cache rules liv
 `robots.txt` was added to clear the lone SEO flag; the Home-view color-contrast
 a11y flag is carried to M5.
 
-### Milestone 5 — Phase 2 (chords) + carried-over tasks
-Sequenced feature-first, productionization last (the M2 precedent). Split into
-serializable sub-milestones:
+### Milestone 5 — Phase 2 (chords) + carried-over tasks ✅ complete
+Phase 2 (Chords) shipped, plus the carried-over M2 tasks (music-font
+self-hosting, the contrast a11y fix, the committed CDP dev helper) and a Basics
+polish pass (American default + accidental cards). Sequenced feature-first,
+productionization last (the M2 precedent). See [HISTORY.md](./HISTORY.md).
 
-- **M5a — Chord engine** ✅ *(this milestone).* `src/lib/chords.js`: the
-  circle-of-fifths `CHORD_SEQUENCE` (11 levels, tonic-major + relative-minor),
-  `buildChordDeck`, correct triad spelling + the inversion/register voicing
-  (`chordTones`/`chordVoicing`/`chordPlacements`/`pickVoicing`), `chordLevelsFor`,
-  labels + option pool. `progression.js` generalised with an optional
-  `levelsFn` (default `levelsFor`) so the gate drives chords unchanged. +22 tests
-  (110 total).
-- **M5b — Chord rendering** ✅ *(this milestone).* `drawChord` in `render.js`
-  (multi-key block chord, per-index accidentals, centred); `npm run render --
-  chord` for SVG iteration.
-- **M5c — Dev card gallery** ✅ *(this milestone; dev-only, never shipped).*
-  `src/dev/CardGallery.svelte` — browse every Basics/Notation/Chords card,
-  gated behind `import.meta.env.DEV` via a dynamic import (tree-shaken from prod).
-- **M5d — Chords quiz view** ✅ *(this milestone).* `Phase2.svelte` on the
-  Phase 0/1 shell (scheduler, relearning, gate, top-up, `Choices` pad, frozen
-  per-presentation voicing); `phase2` flipped ready; Progress gains a Chords
-  two-bar split. Full scope under Phases → Phase 2 above.
-- **M5e — Self-host the music font** ✅ *(this milestone).* App switched to the
-  font-bundled `vexflow/bravura` build (Bravura + Academico embedded as data
-  URIs), with the first-render gate moved to `document.fonts.load` so no glyph
-  asset is fetched from a CDN at runtime — fixes the M1c first-paint race at its
-  root and works offline. Font weight stays in the lazy VexFlow chunk (initial JS
-  ~104KB, well under 200KB). See HISTORY.md.
-- **M5f — Accessibility: fix Home-view contrast** ✅ *(this milestone).* Darkened
-  the light-theme `--accent`/`--accent-hover`/`--accent-weak` (teal-700/800) and
-  `--muted` tokens so every small-text pairing (buttons, badges, level-tags,
-  "Soon" pill) clears WCAG AA 4.5:1; dark theme already passed. See HISTORY.md.
-- **M5h — Dev tooling: committed CDP helper** ✅ *(this milestone; dev-only, never
-  shipped).* `scripts/drive.mjs` + `npm run drive`: launches the installed Chrome
-  headless and drives it over CDP (Node's global `WebSocket`/`fetch`, no
-  Puppeteer/Playwright) — connect → navigate → seed `localStorage` → click-by-text
-  → eval → screenshot. See HISTORY.md.
-- **M5i — Basics: American default + accidental cards** ✅ *(this milestone).*
-  Flipped the Basics duration-name default to American, and added a fourth Basics
-  card type — lone accidental glyphs (sharp/flat/natural) named by multiple choice
-  (symbol recognition, convention-independent). See HISTORY.md.
+**M5a — Chord engine** ✅ shipped — see HISTORY.md.
+
+**M5b — Chord rendering** ✅ shipped — see HISTORY.md.
+
+**M5c — Dev card gallery** ✅ shipped — see HISTORY.md.
+
+**M5d — Chords quiz view** ✅ shipped — see HISTORY.md.
+
+**M5e — Self-host the music font** ✅ shipped — see HISTORY.md.
+
+**M5f — Accessibility: fix Home-view contrast** ✅ shipped — see HISTORY.md.
+
+**M5h — Dev tooling: committed CDP helper** ✅ shipped — see HISTORY.md.
+
+**M5i — Basics: American default + accidental cards** ✅ shipped — see HISTORY.md.
 
 *(M5g — PWA — moved to Milestone 7; its M5e prerequisite is now satisfied.)*
 
