@@ -77,7 +77,7 @@ Single-note reading on both clefs, naturals + accidentals, Letters/Piano answer
 modes, configurable range, Leitner SR, and scale-based curriculum progression.
 Full scope and design in [HISTORY.md](./HISTORY.md).
 
-### Phase 2 — Major / minor triads (next feature — M4)
+### Phase 2 — Major / minor triads (next feature — M5)
 **In scope**
 - Render a 3-note chord, root position, on a single clef
 - User identifies root + quality (e.g. "C major", "A minor")
@@ -90,7 +90,7 @@ Full scope and design in [HISTORY.md](./HISTORY.md).
 - Diminished / augmented qualities
 - Chords spanning both clefs
 
-### Phase 3 — Key signature recognition (M5)
+### Phase 3 — Key signature recognition (M6)
 **In scope**
 - Render a key signature (sharps or flats) on a clef
 - User identifies the major key
@@ -190,7 +190,7 @@ read from each phase's `srt:phaseN` blob (no new persistence). A completion bar
 per phase. The **Notation** phase shows **two** bars — scale-level progression
 and individual-note mastery — since it carries both dimensions. Phases not yet
 built (Chords, Key Signatures) show as locked/empty; Chords gains its own bar
-split when it ships in M4.
+split when it ships in M5.
 
 ### Cost & rate-limit safeguards
 - No backend in v1 — primary defense. No third-party APIs called at runtime.
@@ -203,10 +203,11 @@ split when it ships in M4.
 
 ## Productionization Plan
 
-> ✅ **Milestones 0 – 1d complete** (Phase 1 / Notation shipped). See
+> ✅ **Milestones 0 – 2 complete** — Phase 1 (Notation) and Phase 0 (Basics)
+> shipped, plus the progress view and productionization hardening. See
 > [HISTORY.md](./HISTORY.md).
 
-### Milestone 2 — Basics phase, progress view, polish & productionization
+### Milestone 2 — Basics phase, progress view, polish & productionization ✅ complete
 Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
 the engineering hardening to ship publicly. Sequenced **feature / bugfix /
 cleanup first, productionization last**, in small submilestones.
@@ -223,7 +224,7 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2f — Engineering hardening & carryover bug fixes** ✅ shipped — see HISTORY.md.
 
-**M2g — Publish as OSS**
+### Milestone 3 — Publish as OSS
 - *Licensing* — add an OSS license (e.g. MIT) + the year/owner line.
 - *Privacy* — scrub personal developer info beyond what GitHub inherently
   exposes: author name/email in commit history and config, the README's
@@ -231,17 +232,17 @@ cleanup first, productionization last**, in small submilestones.
 - *Secrets* — ensure no secrets are committed or in history; confirm
   `.gitignore` covers env/secret files and the static app genuinely ships none.
 
-### Milestone 3 — First production deploy
+### Milestone 4 — First production deploy
 - Create Cloudflare Pages project, connect to git
 - Configure custom domain (see Open Questions)
 - **Cache headers** via a Cloudflare Pages `_headers` file — long-lived immutable
   caching for Vite's content-hashed assets, `no-cache` for `index.html` so deploys
-  propagate (extend the `no-cache` rule to the service worker once M4's PWA ships).
+  propagate (extend the `no-cache` rule to the service worker once M5's PWA ships).
   *Moved here from M2f: the headers can only be set and verified once the Pages
   project serves the site.*
 - Verify HTTPS, run Lighthouse, ensure score >90 across the board
 
-### Milestone 4 — Phase 2 (chords) + carried-over tasks
+### Milestone 5 — Phase 2 (chords) + carried-over tasks
 - **Phase 2 (chords)** — the feature; full scope under Phases → Phase 2 above.
 - **Self-host the music font** *(moved from M2f; offline prerequisite).* The app
   dynamic-imports the default `vexflow` build, which fetches the Bravura music font
@@ -254,7 +255,7 @@ cleanup first, productionization last**, in small submilestones.
   fetched at runtime. The font weight lands in the already-lazy VexFlow chunk, not
   the initial bundle, so the <200KB initial-JS budget is unaffected. Until this
   lands the deployed app fetches the font from a CDN (fine online, broken offline)
-  — acceptable through M3, since offline isn't considered until after the first
+  — acceptable through M4, since offline isn't considered until after the first
   deploy. **Prerequisite for the PWA task below.**
 - **PWA (manifest + service worker)** *(moved from M2f; nice-to-have per NFRs, not
   blocking).* Web app manifest + a service worker that precaches the app shell and
@@ -272,7 +273,7 @@ cleanup first, productionization last**, in small submilestones.
   suite as a mismatch with the project's "verify manually, no UI tests" stance;
   revisit `playwright-core` only if a regression suite is later wanted.)
 
-### Milestone 5 — Phase 3 (key signatures)
+### Milestone 6 — Phase 3 (key signatures)
 
 ### Future ideas (not committed)
 - Audio playback of the rendered note (Web Audio API — free, client-side)

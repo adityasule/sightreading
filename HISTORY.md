@@ -239,8 +239,8 @@ escape hatch for the two "no new cards left" dead-ends.
 ### Milestone 2f — Engineering hardening & carryover bug fixes ✅
 The productionization slice of Milestone 2: two carryover bugs the M2e top-up
 surfaced, then robustness hardening for a public deploy. No new user-facing
-features. (Caching headers deferred to M3; the PWA, music-font self-hosting and
-the CDP helper to M4 — offline waits until after the first deploy.)
+features. (Caching headers deferred to M4; the PWA, music-font self-hosting and
+the CDP helper to M5 — offline waits until after the first deploy.)
 - **Per-batch cap, not an unlimited bypass (`Phase1.svelte`, `Phase0.svelte`).**
   The M2e "Add more" top-up set a `bypassCap` flag that fed `pickNext` an
   `Infinity` new-card budget — one click uncapped new cards for the whole session.
