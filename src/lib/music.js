@@ -333,13 +333,15 @@ export function pcName(pc) {
 //
 // The gentle, multiple-choice on-ramp before Phase 1's pitch reading. Basics is
 // symbol recognition, not note naming: the user identifies a *time value* — a
-// note's duration (plain or dotted) or a rest's — or a clef symbol. Pitch is
-// deliberately out of scope here (reading note names is Phase 1 / Notation), so
-// note/rest cards render on a *clef-less* staff at a fixed position and the note
-// is never named; clef cards are the only ones that show a clef in isolation.
-// Each card carries a `type` ('note' | 'rest' | 'clef') so the renderer and the
-// option set branch on it. Phase 0 persists under its own blob (srt:phase0) and
-// reuses the generic scheduler + the multiple-choice answer pad.
+// note's duration (plain or dotted) or a rest's — a clef symbol, or an
+// accidental symbol. Pitch is deliberately out of scope here (reading note names
+// is Phase 1 / Notation), so note/rest cards render on a *clef-less* staff at a
+// fixed position and the note is never named; clef cards are the only ones that
+// show a clef in isolation; accidental cards show a lone accidental glyph and ask
+// its name, never which pitch it alters. Each card carries a `type` ('note' |
+// 'rest' | 'clef' | 'accidental') so the renderer and the option set branch on
+// it. Phase 0 persists under its own blob (srt:phase0) and reuses the generic
+// scheduler + the multiple-choice answer pad.
 
 /** In-place Fisher–Yates shuffle; returns the same array for chaining. */
 function shuffle(arr) {
@@ -400,10 +402,32 @@ export const REST_VALUES = DURATION_VALUES;
 /** Clef-card option pool — the two clefs the user distinguishes. */
 export const CLEF_VALUES = ['treble', 'bass'];
 
+// The accidental symbols a beginner first meets — sharp, flat, natural. Like
+// durations, `value` is the stable grading key (and id suffix); `vex` is the
+// VexFlow accidental type code the renderer maps to a glyph. Unlike durations,
+// the `name` is universal (no British/American split). Double sharp/flat are
+// rarer and left out (GOALS Phase 0 scope). Accidentals here are pure *symbol*
+// recognition — naming the glyph, never which pitch it alters (that is Phase 1).
+// (Distinct from the Phase 1 `ACCIDENTALS` above, which are the Letters answer-pad
+// sharp/flat modifiers — a different concern.)
+const BASICS_ACCIDENTALS = [
+  { value: 'sharp', vex: '#', name: 'Sharp' },
+  { value: 'flat', vex: 'b', name: 'Flat' },
+  { value: 'natural', vex: 'n', name: 'Natural' },
+];
+
+const BASICS_ACCIDENTAL_BY_VALUE = Object.fromEntries(
+  BASICS_ACCIDENTALS.map((a) => [a.value, a])
+);
+
+/** Accidental-card option pool — the three symbols, in teaching order. */
+export const ACCIDENTAL_VALUES = BASICS_ACCIDENTALS.map((a) => a.value);
+
 /** The `choices` pool for a Basics card type. */
 export function optionPoolFor(type) {
   if (type === 'rest') return REST_VALUES;
   if (type === 'clef') return CLEF_VALUES;
+  if (type === 'accidental') return ACCIDENTAL_VALUES;
   return NOTE_KEYS;
 }
 
@@ -442,6 +466,11 @@ export function clefLabel(clef) {
   return `${clef[0].toUpperCase()}${clef.slice(1)} clef`;
 }
 
+/** Label for an accidental card, e.g. 'sharp' → "Sharp". Convention-independent. */
+export function accidentalLabel(value) {
+  return BASICS_ACCIDENTAL_BY_VALUE[value].name;
+}
+
 /**
  * Length in beats of a note/rest `key`, with the quarter note as the reference
  * (1 beat) — the de-facto teaching default. A dot adds half the value, so the
@@ -467,22 +496,25 @@ export function beatsLabel(beats) {
 /**
  * Display label for a Basics card's option `key`, dispatched on `type`. Note and
  * rest options carry their length in beats alongside the name (e.g. "Crotchet ·
- * 1 beat") so the student associates the symbol with its duration; clefs have no
- * beat value.
+ * 1 beat") so the student associates the symbol with its duration; clefs and
+ * accidentals have no beat value.
  */
 export function basicsLabel(type, key, convention = 'british') {
   if (type === 'clef') return clefLabel(key);
+  if (type === 'accidental') return accidentalLabel(key);
   const name = type === 'rest' ? restLabel(key, convention) : noteLabel(key, convention);
   return `${name} · ${beatsLabel(beatsForKey(key))}`;
 }
 
 /**
- * Build the Phase 0 deck: note cards (6 plain + 3 dotted), rest cards (6), and
- * clef cards (2), in teaching order. Clef- and range-independent (pitch is out
- * of scope here), so unlike the Phase 1 deck it takes no settings — the answer
- * *labels*, not the cards, follow the British/American naming convention. Each
+ * Build the Phase 0 deck: note cards (6 plain + 3 dotted), rest cards (6), clef
+ * cards (2), and accidental cards (3), in teaching order. Clef- and
+ * range-independent (pitch is out of scope here), so unlike the Phase 1 deck it
+ * takes no settings — the answer *labels*, not the cards, follow the
+ * British/American naming convention (accidental names are universal). Each
  * card's `key` is its grading value; render data is `vex` (+ `dotted`) for
- * note/rest glyphs and `clef` for clef cards.
+ * note/rest glyphs, `clef` for clef cards, and `vex` (the accidental type code)
+ * for accidental cards.
  */
 export function buildBasicsDeck() {
   const notes = DURATIONS.map((d) => ({
@@ -497,5 +529,8 @@ export function buildBasicsDeck() {
   const clefs = CLEF_VALUES.map((clef) => ({
     type: 'clef', id: `clef:${clef}`, key: clef, clef,
   }));
-  return [...notes, ...dotted, ...rests, ...clefs];
+  const accidentals = BASICS_ACCIDENTALS.map((a) => ({
+    type: 'accidental', id: `acc:${a.value}`, key: a.value, vex: a.vex,
+  }));
+  return [...notes, ...dotted, ...rests, ...clefs, ...accidentals];
 }

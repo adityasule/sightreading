@@ -13,6 +13,7 @@ import {
   noteLabel,
   restLabel,
   clefLabel,
+  accidentalLabel,
   basicsLabel,
   beatsForKey,
   beatsLabel,
@@ -21,6 +22,7 @@ import {
   NOTE_KEYS,
   REST_VALUES,
   CLEF_VALUES,
+  ACCIDENTAL_VALUES,
   isOnStaff,
   isAnchor,
   levelsFor,
@@ -254,14 +256,15 @@ describe('Middle C anchor (cluster-first)', () => {
   });
 });
 
-describe('buildBasicsDeck — Phase 0 deck (notes, rests, clefs)', () => {
-  it('has note (6 plain + 3 dotted), rest (6) and clef (2) cards, unique ids', () => {
+describe('buildBasicsDeck — Phase 0 deck (notes, rests, clefs, accidentals)', () => {
+  it('has note (6 plain + 3 dotted), rest (6), clef (2) and accidental (3) cards, unique ids', () => {
     const deck = buildBasicsDeck();
-    expect(deck).toHaveLength(17);
+    expect(deck).toHaveLength(20);
     const byType = (t) => deck.filter((c) => c.type === t);
     expect(byType('note')).toHaveLength(9);
     expect(byType('rest')).toHaveLength(6);
     expect(byType('clef')).toHaveLength(2);
+    expect(byType('accidental')).toHaveLength(3);
     expect(new Set(deck.map((c) => c.id)).size).toBe(deck.length);
   });
 
@@ -313,6 +316,20 @@ describe('buildBasicsDeck — Phase 0 deck (notes, rests, clefs)', () => {
     expect(deck.find((c) => c.id === 'clef:bass')).toMatchObject({ type: 'clef', clef: 'bass' });
   });
 
+  it('models the three accidental cards, keyed by name with the vex type code', () => {
+    const deck = buildBasicsDeck();
+    expect(deck.find((c) => c.id === 'acc:sharp')).toMatchObject({
+      type: 'accidental',
+      key: 'sharp',
+      vex: '#',
+    });
+    expect(deck.find((c) => c.id === 'acc:flat')).toMatchObject({ type: 'accidental', vex: 'b' });
+    expect(deck.find((c) => c.id === 'acc:natural')).toMatchObject({
+      type: 'accidental',
+      vex: 'n',
+    });
+  });
+
   it('is clef- and range-independent (takes no settings)', () => {
     // Same cards no matter what; pitch/clef/range are out of scope for Basics.
     expect(buildBasicsDeck().map((c) => c.id)).toEqual(buildBasicsDeck().map((c) => c.id));
@@ -332,10 +349,15 @@ describe('Basics option pools', () => {
     expect(CLEF_VALUES).toEqual(['treble', 'bass']);
   });
 
+  it('accidental pool is sharp/flat/natural', () => {
+    expect(ACCIDENTAL_VALUES).toEqual(['sharp', 'flat', 'natural']);
+  });
+
   it('optionPoolFor picks the pool by card type', () => {
     expect(optionPoolFor('note')).toBe(NOTE_KEYS);
     expect(optionPoolFor('rest')).toBe(REST_VALUES);
     expect(optionPoolFor('clef')).toBe(CLEF_VALUES);
+    expect(optionPoolFor('accidental')).toBe(ACCIDENTAL_VALUES);
   });
 
   it('a clef question clamps to its two options', () => {
@@ -343,9 +365,15 @@ describe('Basics option pools', () => {
     expect(opts).toHaveLength(2);
     expect(new Set(opts)).toEqual(new Set(['treble', 'bass']));
   });
+
+  it('an accidental question clamps to its three options', () => {
+    const opts = choices('sharp', ACCIDENTAL_VALUES);
+    expect(opts).toHaveLength(3);
+    expect(new Set(opts)).toEqual(new Set(['sharp', 'flat', 'natural']));
+  });
 });
 
-describe('Basics labels — notes, rests, clefs', () => {
+describe('Basics labels — notes, rests, clefs, accidentals', () => {
   it('noteLabel names plain and dotted notes', () => {
     expect(noteLabel('half')).toBe('Minim');
     expect(noteLabel('half', 'american')).toBe('Half note');
@@ -366,12 +394,21 @@ describe('Basics labels — notes, rests, clefs', () => {
     expect(clefLabel('bass')).toBe('Bass clef');
   });
 
-  it('basicsLabel dispatches on type and appends beats to notes/rests, not clefs', () => {
+  it('accidentalLabel names the accidental, convention-independent', () => {
+    expect(accidentalLabel('sharp')).toBe('Sharp');
+    expect(accidentalLabel('flat')).toBe('Flat');
+    expect(accidentalLabel('natural')).toBe('Natural');
+  });
+
+  it('basicsLabel dispatches on type and appends beats to notes/rests, not clefs/accidentals', () => {
     expect(basicsLabel('note', 'quarter')).toBe('Crotchet · 1 beat');
     expect(basicsLabel('note', 'half.', 'american')).toBe('Dotted half note · 3 beats');
     expect(basicsLabel('rest', 'quarter', 'american')).toBe('Quarter rest · 1 beat');
     expect(basicsLabel('rest', 'eighth')).toBe('Quaver rest · ½ beat');
     expect(basicsLabel('clef', 'bass')).toBe('Bass clef'); // clefs have no beat value
+    // Accidentals have no beat value and ignore the naming convention.
+    expect(basicsLabel('accidental', 'sharp')).toBe('Sharp');
+    expect(basicsLabel('accidental', 'flat', 'american')).toBe('Flat');
   });
 });
 

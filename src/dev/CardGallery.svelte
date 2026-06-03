@@ -8,7 +8,7 @@
   import { settings } from '../lib/settings.svelte.js';
   import { buildBasicsDeck, basicsLabel, buildDeck } from '../lib/music.js';
   import { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } from '../lib/chords.js';
-  import { drawDurationNote, drawRest, drawClef, drawNote, drawChord } from '../lib/render.js';
+  import { drawDurationNote, drawRest, drawClef, drawAccidental, drawNote, drawChord } from '../lib/render.js';
 
   const TABS = [
     { id: 'phase0', label: 'Basics' },
@@ -23,6 +23,7 @@
   function drawBasics(card, el) {
     if (card.type === 'rest') drawRest(vex, el, { duration: card.vex });
     else if (card.type === 'clef') drawClef(vex, el, { clef: card.clef });
+    else if (card.type === 'accidental') drawAccidental(vex, el, { type: card.vex });
     else drawDurationNote(vex, el, { duration: card.vex, dotted: card.dotted });
   }
 
@@ -114,17 +115,24 @@
   }
 
   onMount(async () => {
-    const m = await import('vexflow');
+    // The `/bravura` build bundles the music font as data URIs — no runtime CDN
+    // fetch (M5e); `document.fonts.load` then awaits the registered FontFaces
+    // without re-fetching (unlike `VexFlow.loadFonts`).
+    const m = await import('vexflow/bravura');
     try {
-      await m.VexFlow.loadFonts('Bravura', 'Academico');
+      await Promise.all([
+        document.fonts.load("1em 'Bravura'"),
+        document.fonts.load("1em 'Academico'"),
+      ]);
     } catch {
-      /* offline / no FontFace — render anyway */
+      /* no FontFace API (or load failed) — render anyway */
     }
     vex = {
       Renderer: m.Renderer,
       Stave: m.Stave,
       StaveNote: m.StaveNote,
       Accidental: m.Accidental,
+      GlyphNote: m.GlyphNote,
       Dot: m.Dot,
       Formatter: m.Formatter,
       Voice: m.Voice,

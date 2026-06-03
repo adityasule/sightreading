@@ -319,7 +319,7 @@ configuration, cache headers, and verification.
   Workers static assets honors it: content-hashed `/assets/*` →
   `public, max-age=31536000, immutable`; `/` and `/index.html` → `no-cache` so a
   deploy propagates immediately (extend the `no-cache` rule to the service worker
-  when M5's PWA ships). Verified live with `curl -I`.
+  when the PWA ships, now M7a). Verified live with `curl -I`.
 - **Node pin (`.nvmrc` → 22).** Pins the Cloudflare build's Node version in-repo,
   replacing the manual `NODE_VERSION` dashboard env var (the README had documented
   Node 20, now EOL).
@@ -336,6 +336,54 @@ configuration, cache headers, and verification.
   preview` port note corrected (now `wrangler dev` on :8787).
 - **Secrets — clean.** No tokens/keys in `wrangler.jsonc`/`_headers`/`.nvmrc`;
   `.gitignore` gained `.dev.vars*`; git-connected builds use Cloudflare's own auth.
+
+### Milestone 5e/5f/5h/5i — carried-over tasks + Basics polish ✅
+The carried-over slice of Milestone 5 (the chord feature M5a–d is detailed in
+GOALS until that milestone is fully closed): self-hosting the music font,
+contrast, the committed CDP helper, and two Basics improvements.
+- **M5i — Basics American default + accidental cards.** The Basics
+  duration-name default flipped from British to American (`settings.svelte.js`
+  `DEFAULTS.durationNames`; the per-function fallbacks stay British, so the dev
+  `render` script and unit tests are unchanged). Added a fourth Basics card type:
+  lone **accidental** glyphs — sharp/flat/natural — named by multiple choice. It
+  is symbol recognition (the glyph names an accidental, never which pitch it
+  alters — that stays Phase 1), so the labels are universal and ignore the
+  British/American setting. `BASICS_ACCIDENTALS` in `music.js` (renamed off the
+  existing Phase-1 `ACCIDENTALS`, the Letters-pad modifiers, to avoid a
+  collision) drives `ACCIDENTAL_VALUES`/`accidentalLabel` and the
+  `optionPoolFor`/`basicsLabel`/`buildBasicsDeck` branches; `drawAccidental` in
+  `render.js` draws the glyph via a notehead-less `GlyphNote` reusing
+  `drawCenteredGlyph` (so it centres and tints green/red like the note/rest
+  cards). Deck is now 20 cards; +4 unit tests (114 total).
+- **M5e — Self-host the music font.** All four VexFlow consumers
+  (`Phase0`/`Phase1`/`Phase2`/`CardGallery`) switched from `import('vexflow')` to
+  the font-bundled `import('vexflow/bravura')` (Bravura + Academico embedded as
+  data URIs). Crucially the first-render gate changed from
+  `VexFlow.loadFonts('Bravura','Academico')` — which calls `Font.load(name)` with
+  no URL and so re-fetches from `cdn.jsdelivr.net` — to `document.fonts.load("1em
+  'Bravura'")` (+ Academico), which resolves the already-registered data-URI
+  FontFaces with no network. This removes the runtime third-party call (the M1c
+  first-paint race root cause) and makes rendering work offline. Verified: a
+  headless run found zero `jsdelivr`/`.woff2` resource fetches; the production
+  build keeps initial JS at ~104KB (35.9KB gzip) with the font weight in the lazy
+  `vexflow-bravura` chunk.
+- **M5f — Home-view contrast (a11y, the M4 carry).** Darkened the light-theme
+  tokens in `app.css`: `--accent` `#0d9488`→`#0f766e` (teal-700), `--accent-hover`
+  `#0f766e`→`#115e59` (teal-800), `--accent-weak` recomputed, and `--muted`
+  `#71717a`→`#6b6b73`. Measured ≥4.5:1 for every flagged small-text pairing —
+  white-on-accent buttons (5.5:1), accent-on-tinted-badge (4.8:1), and the "Soon"
+  pill (4.8:1). Dark theme already passed (6–10:1), left unchanged.
+- **M5h — Committed CDP dev helper (`scripts/drive.mjs`, `npm run drive`).** The
+  M2e throwaway smoke-test, promoted to a small dev-only helper beside `render`.
+  Launches the *installed* Chrome headless (port 0 → DevToolsActivePort) and
+  talks CDP over Node's global `WebSocket` + `fetch` — no Puppeteer/Playwright,
+  no browser binary. Exports `connect()` → a driver
+  (`navigate`/`seedLocalStorage`/`clickByText`/`eval`/`waitFor`/`screenshot`/
+  `close`) plus a `shot`/`eval` CLI. Used to verify all of the above end-to-end
+  (seed `srt:phase0` → drive Basics → confirm the accidental card renders + the
+  "Which accidental is this?" prompt). The browser stays the source of truth for
+  UI checks. (Playwright was reconsidered and again rejected — the binary weight
+  and a standing e2e suite mismatch the project's manual-verify stance.)
 
 ---
 

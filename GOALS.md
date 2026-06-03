@@ -64,15 +64,21 @@ to Phase 1, not here.
 - **Dotted notes** ✅ (M2d) — the common three (dotted half/quarter/eighth); a
   note card's options mix dotted + plain. Every note/rest option also shows its
   length in beats, so the symbol is tied to its duration.
+- **Accidental-symbol cards** ✅ (M5i) — render a lone accidental glyph;
+  user names it. The common three: sharp, flat, natural. Pure *symbol*
+  recognition — the glyph names an accidental, never which pitch it alters (that
+  is Phase 1). Names are universal, so the British/American setting doesn't apply.
 - All answers are **multiple choice**.
 - **Naming-convention setting** — British or American duration names, **default
-  British** (see the table in Design Notes). Affects duration + rest cards only.
+  American** (see the table in Design Notes). Affects duration + rest cards only
+  (accidental names are universal).
 - Reuses the generic Leitner scheduler. Route id `phase0`, storage `srt:phase0`,
   user-facing name **Basics**.
 
 **Out of scope (Phase 0)**
-- Pitch reading / note naming, accidentals, tied durations, time signatures, and
-  recall/typed input (all Phase 1 or later).
+- Pitch reading / note naming (incl. *which* note an accidental alters), tied
+  durations, time signatures, and recall/typed input (all Phase 1 or later).
+  Accidental *symbol* naming is in scope (above); accidentals-as-pitch is Phase 1.
 
 ### Phase 1 — Single notes, treble & bass clef ✅ shipped
 Single-note reading on both clefs, naturals + accidentals, Letters/Piano answer
@@ -156,22 +162,27 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 - VexFlow renders to SVG. Minimal — no time signatures, no measure bars.
 - Single staff: one note (Phase 1) or 3 stacked notes (Phase 2).
 - Phase 0 also renders, in isolation: a single clef-less note of a given
-  duration (note time-value cards), a rest glyph (rest time-value cards), and a
-  lone clef (clef-symbol cards).
-- **Font race:** await `VexFlow.loadFonts('Bravura', 'Academico')` before the
-  first render, or glyph metrics are wrong on first paint (see M1c in HISTORY).
+  duration (note time-value cards), a rest glyph (rest time-value cards), a
+  lone clef (clef-symbol cards), and a lone accidental glyph (accidental cards,
+  drawn via a notehead-less `GlyphNote`).
+- **Music font:** the app dynamic-imports the **font-bundled `vexflow/bravura`**
+  build (Bravura + Academico embedded as data URIs), so no glyph asset is fetched
+  from a CDN at runtime — works offline, and removes the M1c first-paint race at
+  its root (M5e). Gate the first render on `document.fonts.load("1em 'Bravura'")`
+  (+ Academico), **not** `VexFlow.loadFonts(...)` — the latter would re-fetch the
+  font from the CDN the bundled build exists to avoid.
 
 ### Phase 0 — Basics (design)
 - **Answer input:** a reusable multiple-choice component (4 options, one
   correct), distinct from the Phase 1 Letters/Piano pads. Touch-friendly, 44px
   targets, keyboard-selectable on desktop.
 - **Card types** share one `srt:phase0` deck through the generic scheduler:
-  note-duration (M2c), rest-duration, clef-symbol. Each card carries its `type`
-  so the renderer and the option set can branch.
-- **Clef-less, fixed-position rendering** for duration/rest cards: the glyph
-  sits at a fixed staff position with no clef drawn, since pitch is irrelevant
-  here and clef symbols aren't introduced until the clef-symbol cards.
-- **Duration naming** honours the British/American setting (default British):
+  note-duration (M2c), rest-duration, clef-symbol, accidental-symbol. Each card
+  carries its `type` so the renderer and the option set can branch.
+- **Clef-less, fixed-position rendering** for duration/rest/accidental cards: the
+  glyph sits at a fixed staff position with no clef drawn, since pitch is
+  irrelevant here and clef symbols aren't introduced until the clef-symbol cards.
+- **Duration naming** honours the British/American setting (default American):
 
   | American          | British      |
   |-------------------|--------------|
@@ -274,41 +285,37 @@ serializable sub-milestones:
   Phase 0/1 shell (scheduler, relearning, gate, top-up, `Choices` pad, frozen
   per-presentation voicing); `phase2` flipped ready; Progress gains a Chords
   two-bar split. Full scope under Phases → Phase 2 above.
-- **M5e — Self-host the music font** *(moved from M2f; offline prerequisite).* The app
-  dynamic-imports the default `vexflow` build, which fetches the Bravura music font
-  from a third-party CDN mid-render (root cause of the M1c first-paint bug) — a
-  runtime third-party call at odds with the no-runtime-API constraint, *and* the
-  reason note rendering breaks offline (the `loadFonts` catch blocks in
-  `Phase0.svelte`/`Phase1.svelte` already degrade to wrong glyph metrics when the
-  fetch fails). Switch to the font-bundled build (`vexflow/bravura`, which
-  `scripts/render.mjs` already uses) or self-host the woff2, so no glyph asset is
-  fetched at runtime. The font weight lands in the already-lazy VexFlow chunk, not
-  the initial bundle, so the <200KB initial-JS budget is unaffected. Until this
-  lands the deployed app fetches the font from a CDN (fine online, broken offline)
-  — acceptable through M4, since offline isn't considered until after the first
-  deploy. **Prerequisite for the PWA task below.**
-- **M5g — PWA (manifest + service worker)** *(moved from M2f; nice-to-have per NFRs,
-  not blocking; depends on M5e).* Web app manifest + a service worker that precaches the app shell and
-  the lazy VexFlow chunk for offline use. Relies on the font self-hosting task
-  above (no runtime CDN fetch), so offline is genuinely offline by the time this
-  lands. Keep the worker conservative about staleness (versioned precache or
-  network-first for the HTML) so a deploy is never pinned by a stale cached worker.
-- **M5h — Dev tooling: committed CDP helper** *(moved from M2f; independent of feature
-  work).* Promote the throwaway headless-Chrome / CDP script used to smoke-test M2e
-  into a small, committed dev-only helper (e.g. `scripts/drive.mjs`, beside the
-  `render` script): a reusable connect → seed `localStorage` → click-by-text →
-  screenshot / eval API over the installed Chrome. No new heavyweight deps (Node's
-  global `WebSocket`); the browser stays the source of truth for UI checks.
-  (Considered Playwright — rejected the browser-binary weight + a standing e2e
-  suite as a mismatch with the project's "verify manually, no UI tests" stance;
-  revisit `playwright-core` only if a regression suite is later wanted.)
-- **M5f — Accessibility: fix Home-view contrast** *(found in M4's Lighthouse run;
-  a11y 94 → ~100).* The teal accent `#0d9488` fails WCAG AA as small text on
-  light-teal badges/level-tags (3.3:1) and as white-on-teal primary buttons
-  (3.7:1), and the "Soon" badge gray is 4.39:1. Darken the accent/muted theme
-  tokens to ≥4.5:1 and re-verify in light + dark.
+- **M5e — Self-host the music font** ✅ *(this milestone).* App switched to the
+  font-bundled `vexflow/bravura` build (Bravura + Academico embedded as data
+  URIs), with the first-render gate moved to `document.fonts.load` so no glyph
+  asset is fetched from a CDN at runtime — fixes the M1c first-paint race at its
+  root and works offline. Font weight stays in the lazy VexFlow chunk (initial JS
+  ~104KB, well under 200KB). See HISTORY.md.
+- **M5f — Accessibility: fix Home-view contrast** ✅ *(this milestone).* Darkened
+  the light-theme `--accent`/`--accent-hover`/`--accent-weak` (teal-700/800) and
+  `--muted` tokens so every small-text pairing (buttons, badges, level-tags,
+  "Soon" pill) clears WCAG AA 4.5:1; dark theme already passed. See HISTORY.md.
+- **M5h — Dev tooling: committed CDP helper** ✅ *(this milestone; dev-only, never
+  shipped).* `scripts/drive.mjs` + `npm run drive`: launches the installed Chrome
+  headless and drives it over CDP (Node's global `WebSocket`/`fetch`, no
+  Puppeteer/Playwright) — connect → navigate → seed `localStorage` → click-by-text
+  → eval → screenshot. See HISTORY.md.
+- **M5i — Basics: American default + accidental cards** ✅ *(this milestone).*
+  Flipped the Basics duration-name default to American, and added a fourth Basics
+  card type — lone accidental glyphs (sharp/flat/natural) named by multiple choice
+  (symbol recognition, convention-independent). See HISTORY.md.
+
+*(M5g — PWA — moved to Milestone 7; its M5e prerequisite is now satisfied.)*
 
 ### Milestone 6 — Phase 3 (key signatures)
+
+### Milestone 7 — Refinement
+- **M7a — PWA (manifest + service worker)** *(was M5g; nice-to-have per NFRs, not
+  blocking).* Web app manifest + a service worker that precaches the app shell and
+  the lazy VexFlow chunk for offline use. Its prerequisite (no runtime CDN font
+  fetch) is satisfied by M5e, so offline is genuinely offline by the time this
+  lands. Keep the worker conservative about staleness (versioned precache or
+  network-first for the HTML) so a deploy is never pinned by a stale cached worker.
 
 ### Future ideas (not committed)
 - Audio playback of the rendered note (Web Audio API — free, client-side)

@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { settings } from '../lib/settings.svelte.js';
   import { buildBasicsDeck, choices, basicsLabel, optionPoolFor } from '../lib/music.js';
-  import { drawDurationNote, drawRest, drawClef } from '../lib/render.js';
+  import { drawDurationNote, drawRest, drawClef, drawAccidental } from '../lib/render.js';
   import Choices from '../lib/Choices.svelte';
   import QuizSettings from '../lib/QuizSettings.svelte';
   import * as srs from '../lib/spaced-repetition.js';
@@ -70,7 +70,9 @@
       ? 'What kind of rest is this?'
       : current?.type === 'clef'
         ? 'Which clef is this?'
-        : 'What kind of note is this?'
+        : current?.type === 'accidental'
+          ? 'Which accidental is this?'
+          : 'What kind of note is this?'
   );
 
   function refreshCounts() {
@@ -205,6 +207,8 @@
       drawRest(vex, staffEl, { duration: current.vex, color });
     } else if (current.type === 'clef') {
       drawClef(vex, staffEl, { clef: current.clef }); // no glyph tint — see render.js
+    } else if (current.type === 'accidental') {
+      drawAccidental(vex, staffEl, { type: current.vex, color });
     } else {
       drawDurationNote(vex, staffEl, { duration: current.vex, dotted: current.dotted, color });
     }
@@ -212,22 +216,31 @@
 
   onMount(async () => {
     // VexFlow is heavy (~700KB gz). Dynamic-import so it only loads when this
-    // view opens, keeping the initial bundle small.
-    const m = await import('vexflow');
+    // view opens, keeping the initial bundle small. The `/bravura` build bundles
+    // the music font (Bravura + Academico) as embedded data URIs, so no glyph
+    // asset is fetched from a CDN at runtime (works offline; M5e).
+    const m = await import('vexflow/bravura');
     vex = {
       Renderer: m.Renderer,
       Stave: m.Stave,
       StaveNote: m.StaveNote,
       Dot: m.Dot,
+      GlyphNote: m.GlyphNote,
       Formatter: m.Formatter,
       Voice: m.Voice,
     };
     // Gate the first render on the music font being ready, or glyph metrics are
-    // wrong on first paint (see M1c in HISTORY).
+    // wrong on first paint (see M1c in HISTORY). The bravura build registers both
+    // FontFaces from data URIs at import, so `document.fonts.load` resolves them
+    // with no network — unlike `VexFlow.loadFonts`, which would re-fetch the
+    // font from the CDN the bundled build exists to avoid.
     try {
-      await m.VexFlow.loadFonts('Bravura', 'Academico');
+      await Promise.all([
+        document.fonts.load("1em 'Bravura'"),
+        document.fonts.load("1em 'Academico'"),
+      ]);
     } catch {
-      /* font fetch failed (offline / no FontFace API) — render anyway */
+      /* no FontFace API (or load failed) — render anyway */
     }
     next();
   });
@@ -248,7 +261,7 @@
 
   <header class="head">
     <h2>Basics</h2>
-    <p class="muted">Identify each symbol — note and rest values, and clefs.</p>
+    <p class="muted">Identify each symbol — note and rest values, clefs, and accidentals.</p>
   </header>
 
   <div class="stats" aria-live="polite">

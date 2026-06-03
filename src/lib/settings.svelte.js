@@ -10,7 +10,7 @@
  *   ledgerLines     number                 ledger lines above/below each staff
  *                                          (deck range size)
  *   durationNames   'british' | 'american' note-value naming for Basics cards
- *                                          (default British)
+ *                                          (default American)
  */
 
 import { DEFAULT_LEDGER_LINES } from './music.js';
@@ -30,7 +30,7 @@ const DEFAULTS = {
   bass: true,
   newCardsPerDay: 5,
   ledgerLines: DEFAULT_LEDGER_LINES,
-  durationNames: 'british',
+  durationNames: 'american',
 };
 
 function read() {

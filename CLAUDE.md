@@ -16,7 +16,8 @@ npm run dev      # vite dev server on :5173 (also on LAN — see README for phon
 npm run build    # production build → ./dist
 npm run preview  # serve ./dist on :4173
 npm test         # run the Vitest unit tests once (npm run test:watch to watch)
-npm run render   # render staff glyphs (Basics + Phase 1) to ./render-out/*.svg (dev-only)
+npm run render   # render staff glyphs (Basics + Phase 1/2) to ./render-out/*.svg (dev-only)
+npm run drive    # drive the app in a headless Chrome over CDP (dev-only smoke tests)
 ```
 **Vitest** (dev-only, never shipped) covers the pure-logic modules — `music.js`,
 `spaced-repetition.js`, `progression.js` — via colocated `src/lib/*.test.js`
@@ -29,9 +30,19 @@ self-contained SVGs via Node + jsdom, going through the same `src/lib/render.js`
 the app uses (so output can't drift) and embedding the Bravura font so each SVG
 opens anywhere. It's for *fast iteration* on the rendering — the browser is
 still the source of truth for correctness. `npm run render` emits all Basics
-cards (notes/rests/clefs); `-- note|rest|clef|phase1` narrows by kind, an
-optional second arg filters by key/value/id (`-- rest quarter`, `-- phase1
-treble:60`), and `-- --feedback` tints. Output dir is git-ignored.
+cards (notes/rests/clefs/accidentals); `-- note|rest|clef|accidental|phase1|chord`
+narrows by kind, an optional second arg filters by key/value/id (`-- rest
+quarter`, `-- phase1 treble:60`), and `-- --feedback` tints. Output dir is
+git-ignored.
+
+**`drive`** (dev-only, never shipped) launches the *installed* Chrome headless
+and talks CDP over Node's global `WebSocket`/`fetch` (no Puppeteer/Playwright) —
+the committed form of the M2e smoke-test. CLI: `npm run drive -- shot <url>
+[out.png]` and `npm run drive -- eval <url> "<expr>"`; imported, it exports
+`connect()` → a driver (`navigate`/`seedLocalStorage`/`clickByText`/`eval`/
+`waitFor`/`screenshot`/`close`) for scripted scenarios. Needs a running dev
+server; `$CHROME` overrides the binary. The browser stays the source of truth
+for UI checks.
 
 ## Architecture
 Svelte 5 + Vite SPA. View-switching by simple state, no router.
