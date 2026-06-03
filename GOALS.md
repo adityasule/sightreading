@@ -203,8 +203,9 @@ split when it ships in M5.
 
 ## Productionization Plan
 
-> ✅ **Milestones 0 – 2 complete** — Phase 1 (Notation) and Phase 0 (Basics)
-> shipped, plus the progress view and productionization hardening. See
+> ✅ **Milestones 0 – 3 complete** — Phase 1 (Notation) and Phase 0 (Basics)
+> shipped, plus the progress view, productionization hardening, and the OSS
+> publish prep (license, privacy scrub, secrets audit). See
 > [HISTORY.md](./HISTORY.md).
 
 ### Milestone 2 — Basics phase, progress view, polish & productionization ✅ complete
@@ -224,13 +225,12 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2f — Engineering hardening & carryover bug fixes** ✅ shipped — see HISTORY.md.
 
-### Milestone 3 — Publish as OSS
-- *Licensing* — add an OSS license (e.g. MIT) + the year/owner line.
-- *Privacy* — scrub personal developer info beyond what GitHub inherently
-  exposes: author name/email in commit history and config, the README's
-  machine-specific hostnames/IPs, `.idea/` and local paths, `userEmail`-type data.
-- *Secrets* — ensure no secrets are committed or in history; confirm
-  `.gitignore` covers env/secret files and the static app genuinely ships none.
+### Milestone 3 — Publish as OSS ✅ complete
+Shipped — see [HISTORY.md](./HISTORY.md). MIT license added (year/owner line),
+the README's machine-specific hostname/IP scrubbed to placeholders, and a
+secrets/history audit confirmed the static app ships and tracks none. Git
+identity (`Aditya Sule <me@adityasule.com>`, a public domain alias) kept as the
+intended publish identity — no history rewrite.
 
 ### Milestone 4 — First production deploy
 - Create Cloudflare Pages project, connect to git

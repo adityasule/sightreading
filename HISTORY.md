@@ -278,6 +278,32 @@ the CDP helper to M5 — offline waits until after the first deploy.)
   persistence-robustness cases (version stamping, future-version and non-object
   fallback, legacy migration).
 
+### Milestone 3 — Publish as OSS ✅
+Made the repo ready to publish publicly. No code changes — licensing, docs, and a
+privacy/secrets audit only.
+- **License** — added a top-level `LICENSE` (MIT, `Copyright (c) 2026 Aditya
+  Sule`) and `"license": "MIT"` in `package.json`. `"private": true` kept (this
+  is a web app, never an npm package — the flag guards against an accidental
+  publish).
+- **Privacy scrub** — the only machine-specific data was in `README.md`: the
+  Mac's literal Bonjour hostname and an example LAN IP in the phone-testing
+  instructions. Generalised both to placeholders, keeping the
+  `scutil --get LocalHostName` / `ipconfig getifaddr en0` instructions so any
+  reader can find their own. The `adityasule.com` / `sightread.adityasule.com`
+  references are the intended public hosting domain and stay.
+- **Git identity** — kept as `Aditya Sule <me@adityasule.com>` (a domain alias
+  matching the public hosting domain, which GitHub exposes for any public repo
+  anyway). No history rewrite, so commit hashes are unchanged.
+- **Secrets audit — clean.** No `.env`/secret/key files are tracked or ever were
+  (`git log --all --full-history` empty for them); no API keys/tokens in source
+  (the app is fully static with no backend); `.gitignore` already covers
+  `.env*`, `.idea`, `dist`, `render-out`, `*.log`, `.DS_Store`, and `.idea/` was
+  never committed.
+- **Docs refresh** — brought the README "Project structure" block back in line
+  with the current tree (it predated the Basics/Progress views and the
+  `Choices`/`render.js`/`phases.js`/`progression.js` modules) and added a License
+  section.
+
 ---
 
 ## Resolved design notes
