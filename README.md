@@ -10,7 +10,8 @@ repetition. Open source under the [MIT License](./LICENSE). See
 npm install
 npm run dev      # http://localhost:5173 (also exposed on your LAN)
 npm run build    # outputs ./dist
-npm run preview  # serve ./dist locally on :4173 (also exposed on your LAN)
+npm run preview  # build, then serve ./dist via the Workers runtime (wrangler dev) on :8787
+npm run deploy   # build, then deploy to Cloudflare Workers (wrangler deploy)
 npm test         # run the unit tests once
 npm run render   # (dev-only) render staff glyphs to ./render-out/*.svg
 ```
@@ -53,8 +54,10 @@ stays stable across reconnects.
    http://<name>.local:5173
    ```
 
-To test a production build the same way, run `npm run preview` and use port
-**4173** instead of 5173.
+The production preview now runs under the Workers runtime: `npm run preview`
+builds and serves the app at `http://localhost:8787` (localhost only — not
+exposed on the LAN). For on-device testing use the dev server (`npm run dev`)
+on :5173, which is LAN-exposed as described above.
 
 ### If `.local` doesn't resolve
 
@@ -77,22 +80,32 @@ so re-check it if the page stops loading.
 - **Page loads but looks stale** — hard-refresh on the device; the dev server
   hot-reloads, but a cached service worker (added later) can interfere.
 
-## Deploying to Cloudflare Pages
+## Deploying to Cloudflare Workers
 
-Once the repo is on GitHub:
+The app ships as a **static-assets-only Worker** — `wrangler.jsonc` has no `main`
+(no server code), just an `assets` binding with single-page-app fallback — so the
+no-backend constraint still holds; this is static hosting on the Workers platform.
+Two ways to ship:
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create application** →
-   **Pages** → **Connect to Git**, pick this repo.
-2. Build settings:
-   - Framework preset: **None** (or Svelte, either is fine)
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Node version: 20 (set via env var `NODE_VERSION=20` if needed)
-3. After first deploy, **Custom domains** → add the subdomain
-   (recommendation: `sightread.adityasule.com`). If the apex domain's DNS is
-   already on Cloudflare, the CNAME is one click.
+- **Git-connected (recommended)** — the Cloudflare dashboard builds on each push.
+  In the connected project's build settings:
+  - Build command: `npm run build`
+  - Deploy command: `npx wrangler deploy`
+  - Node version: pinned by `.nvmrc` (22) — no dashboard env var needed.
+- **Locally** — `npm run deploy` (`wrangler deploy`) after a one-time
+  `wrangler login`.
 
-No backend, no environment secrets, no API keys. The free Pages tier covers
+After the first deploy, add the custom domain under the Worker's **Settings →
+Domains & Routes** — this app runs at `sightreading.adityasule.com`. If the apex
+domain's DNS is already on Cloudflare, it's one click.
+
+Caching is configured in-repo by [`public/_headers`](./public/_headers) (Vite
+copies it to the build root, where Workers static assets honors it): the
+content-hashed `/assets/*` are cached immutably for a year, while `index.html`
+is served `no-cache` so a new deploy propagates immediately. Unknown paths fall
+back to `index.html` via `not_found_handling` in `wrangler.jsonc`.
+
+No backend, no environment secrets, no API keys. The free Workers tier covers
 this app's expected usage by orders of magnitude.
 
 ## Project structure
@@ -106,6 +119,8 @@ GOALS.md                  forward-looking plan + scope
 HISTORY.md                shipped milestones + resolved design notes
 CLAUDE.md                 working guidance for this repo
 index.html                Vite entry
+wrangler.jsonc            Cloudflare Workers config (static assets + SPA fallback)
+public/_headers           Cloudflare cache-control rules (immutable assets, no-cache HTML)
 scripts/render.mjs        dev-only staff-glyph SVG renderer (npm run render)
 src/
   main.js                 Svelte 5 mount
