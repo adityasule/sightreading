@@ -304,6 +304,39 @@ privacy/secrets audit only.
   `Choices`/`render.js`/`phases.js`/`progression.js` modules) and added a License
   section.
 
+### Milestone 4 — First production deploy ✅
+The app is live at `sightreading.adityasule.com`. No new features — deploy
+configuration, cache headers, and verification.
+- **Cloudflare Workers, not Pages.** Cloudflare's git integration auto-configured
+  the *Workers* path via a PR (`@cloudflare/vite-plugin` in `vite.config.js`, a
+  `wrangler.jsonc`, `wrangler`/plugin devDeps; `npm run deploy` = `wrangler
+  deploy`, `npm run preview` = `wrangler dev`). It's a **static-assets-only
+  Worker** — `wrangler.jsonc` has no `main`, just an `assets` binding with
+  `not_found_handling: single-page-application` — so the no-backend constraint
+  still holds; this is static hosting on the Workers platform. The bot's defaults
+  (`observability`, `nodejs_compat`) are no-ops for assets-only.
+- **Cache headers (`public/_headers`).** Vite copies it to the build root, where
+  Workers static assets honors it: content-hashed `/assets/*` →
+  `public, max-age=31536000, immutable`; `/` and `/index.html` → `no-cache` so a
+  deploy propagates immediately (extend the `no-cache` rule to the service worker
+  when M5's PWA ships). Verified live with `curl -I`.
+- **Node pin (`.nvmrc` → 22).** Pins the Cloudflare build's Node version in-repo,
+  replacing the manual `NODE_VERSION` dashboard env var (the README had documented
+  Node 20, now EOL).
+- **Custom domain + HTTPS.** `sightreading.adityasule.com` (subdomain chosen over
+  a path on the apex). HTTP/2 + HTTP/3, valid auto-provisioned TLS.
+- **Lighthouse (mobile, live URL): 100 / 94 / 100 / 91** (performance /
+  accessibility / best-practices / SEO) — all above the >90 target. Two sub-100
+  items: a `robots.txt` SEO flag (the SPA fallback served HTML for `/robots.txt`),
+  fixed by adding `public/robots.txt`; and a color-contrast a11y flag on the Home
+  view (the teal accent `#0d9488` as small text and white-on-teal buttons, 3.3–3.7
+  vs the 4.5:1 needed) — carried to M5 as a theme-token tweak needing light+dark
+  verification.
+- **Docs.** README deploy section reconciled from Pages to Workers; the `npm run
+  preview` port note corrected (now `wrangler dev` on :8787).
+- **Secrets — clean.** No tokens/keys in `wrangler.jsonc`/`_headers`/`.nvmrc`;
+  `.gitignore` gained `.dev.vars*`; git-connected builds use Cloudflare's own auth.
+
 ---
 
 ## Resolved design notes

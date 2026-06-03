@@ -11,7 +11,7 @@ multi-user.
 
 ## Non-Functional Requirements
 - Works on mobile (iOS/Android), tablet (iPad), and desktop browsers
-- Hosted under `adityasule.com` (final URL TBD — see Open Questions)
+- Hosted at `sightreading.adityasule.com` (Cloudflare Workers, free tier)
 - Minimal hosting cost — target $0/month indefinitely on free tier
 - Strict cost-cap: app must not be able to accrue unexpected charges
 - Fast first load (target <200KB initial JS, <1s TTI on 4G)
@@ -36,8 +36,10 @@ browser. (Future option: opt-in export/import a JSON blob.)
 - **Spaced repetition**: client-side Leitner box variant (see Design Notes)
 - **Persistence**: `localStorage` (single JSON blob) — migrate to IndexedDB
   only if size becomes a problem
-- **Hosting**: Cloudflare Pages, custom domain via Cloudflare DNS
-- **Deploy**: git push → Cloudflare auto-builds and deploys
+- **Hosting**: Cloudflare Workers (static-assets-only Worker), custom domain via
+  Cloudflare DNS
+- **Deploy**: git push → Cloudflare auto-builds (`npm run build`) and deploys
+  (`wrangler deploy`)
 
 ---
 
@@ -203,10 +205,10 @@ split when it ships in M5.
 
 ## Productionization Plan
 
-> ✅ **Milestones 0 – 3 complete** — Phase 1 (Notation) and Phase 0 (Basics)
-> shipped, plus the progress view, productionization hardening, and the OSS
-> publish prep (license, privacy scrub, secrets audit). See
-> [HISTORY.md](./HISTORY.md).
+> ✅ **Milestones 0 – 4 complete** — Phase 1 (Notation) and Phase 0 (Basics)
+> shipped, plus the progress view, productionization hardening, the OSS publish
+> prep, and the first production deploy (Cloudflare Workers, live at
+> `sightreading.adityasule.com`). See [HISTORY.md](./HISTORY.md).
 
 ### Milestone 2 — Basics phase, progress view, polish & productionization ✅ complete
 Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
@@ -232,15 +234,14 @@ secrets/history audit confirmed the static app ships and tracks none. Git
 identity (`Aditya Sule <me@adityasule.com>`, a public domain alias) kept as the
 intended publish identity — no history rewrite.
 
-### Milestone 4 — First production deploy
-- Create Cloudflare Pages project, connect to git
-- Configure custom domain (see Open Questions)
-- **Cache headers** via a Cloudflare Pages `_headers` file — long-lived immutable
-  caching for Vite's content-hashed assets, `no-cache` for `index.html` so deploys
-  propagate (extend the `no-cache` rule to the service worker once M5's PWA ships).
-  *Moved here from M2f: the headers can only be set and verified once the Pages
-  project serves the site.*
-- Verify HTTPS, run Lighthouse, ensure score >90 across the board
+### Milestone 4 — First production deploy ✅ complete
+Shipped — see [HISTORY.md](./HISTORY.md). Deployed to **Cloudflare Workers**
+(static-assets-only Worker, not Pages — auto-configured by Cloudflare's git
+integration) at `sightreading.adityasule.com`; `public/_headers` cache rules live
+(immutable hashed assets, `no-cache` HTML); HTTPS + HTTP/3; Lighthouse 100 / 94 /
+100 / 91 (perf / a11y / best-practices / SEO), all above the >90 target. A
+`robots.txt` was added to clear the lone SEO flag; the Home-view color-contrast
+a11y flag is carried to M5.
 
 ### Milestone 5 — Phase 2 (chords) + carried-over tasks
 - **Phase 2 (chords)** — the feature; full scope under Phases → Phase 2 above.
@@ -272,6 +273,11 @@ intended publish identity — no history rewrite.
   (Considered Playwright — rejected the browser-binary weight + a standing e2e
   suite as a mismatch with the project's "verify manually, no UI tests" stance;
   revisit `playwright-core` only if a regression suite is later wanted.)
+- **Accessibility — fix Home-view contrast** *(found in M4's Lighthouse run;
+  a11y 94 → ~100).* The teal accent `#0d9488` fails WCAG AA as small text on
+  light-teal badges/level-tags (3.3:1) and as white-on-teal primary buttons
+  (3.7:1), and the "Soon" badge gray is 4.39:1. Darken the accent/muted theme
+  tokens to ≥4.5:1 and re-verify in light + dark.
 
 ### Milestone 6 — Phase 3 (key signatures)
 
@@ -284,10 +290,15 @@ intended publish identity — no history rewrite.
 ---
 
 ## Open Questions
-- **Subdomain vs path**: `sightread.adityasule.com` vs `adityasule.com/sightread`?
-  Recommendation: subdomain — cleaner separation from anything else hosted on
-  the apex, easier to rebuild or retire independently.
 - **VexFlow version pin**: pinned to `^5.0.0` for now; revisit on each minor bump.
+
+### Resolved (2026-06-03, Milestone 4)
+- **Subdomain vs path** → **subdomain**: deployed at `sightreading.adityasule.com`
+  (cleaner to retire/rebuild independently than a path on the apex).
+- **Hosting platform** → **Cloudflare Workers** (static-assets-only Worker), not
+  Pages: Cloudflare's git integration auto-configured the Workers path
+  (`@cloudflare/vite-plugin` + `wrangler.jsonc`). Still no backend — assets-only,
+  no server code.
 
 ### Resolved (2026-06-02, Milestone 2 planning)
 - **Phase 0 name** → **Basics** (route id `phase0`, storage `srt:phase0`).
