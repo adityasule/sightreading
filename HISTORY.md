@@ -337,10 +337,34 @@ configuration, cache headers, and verification.
 - **Secrets — clean.** No tokens/keys in `wrangler.jsonc`/`_headers`/`.nvmrc`;
   `.gitignore` gained `.dev.vars*`; git-connected builds use Cloudflare's own auth.
 
+### Milestone 5a–d — Phase 2 (chords) ✅
+The Chords phase: recognise a major/minor triad — root + quality — from a
+randomised voicing (root position / 1st / 2nd inversion at a varied register),
+by multiple choice. Built feature-first on the Phase 0/1 shell.
+- **M5a — Chord engine (`src/lib/chords.js`).** The circle-of-fifths
+  `CHORD_SEQUENCE` (11 levels, each a tonic-major + its relative-minor),
+  `buildChordDeck`, correct triad spelling and the inversion/register voicing
+  (`chordTones`/`chordVoicing`/`chordPlacements`/`pickVoicing`), `chordLevelsFor`,
+  plus labels and the option pool. `progression.js` was generalised with an
+  optional `levelsFn` (default `levelsFor`) so the same gate drives chords
+  unchanged. +22 tests.
+- **M5b — Chord rendering.** `drawChord` in `render.js` — a multi-key block chord
+  (open noteheads, no stem) with per-index accidentals, centred on the notehead
+  column; `npm run render -- chord` for fast SVG iteration.
+- **M5c — Dev card gallery (dev-only, never shipped).** `src/dev/CardGallery.svelte`
+  browses every Basics/Notation/Chords card through the same `render.js` the quiz
+  uses, gated behind `import.meta.env.DEV` via a dynamic import (tree-shaken from
+  prod).
+- **M5d — Chords quiz view.** `Phase2.svelte` on the Phase 0/1 shell (scheduler,
+  in-session relearning, progression gate, manual top-up, the `Choices` pad, a
+  voicing frozen per presentation); `phase2` flipped to ready; the Progress view
+  gained a Chords two-bar split. The chord is recognised regardless of how it's
+  voiced/inverted; circle-of-fifths progression with the same gate as Notation.
+
 ### Milestone 5e/5f/5h/5i — carried-over tasks + Basics polish ✅
-The carried-over slice of Milestone 5 (the chord feature M5a–d is detailed in
-GOALS until that milestone is fully closed): self-hosting the music font,
-contrast, the committed CDP helper, and two Basics improvements.
+The carried-over slice of Milestone 5 (the chord feature M5a–d is above):
+self-hosting the music font, contrast, the committed CDP helper, and two Basics
+improvements.
 - **M5i — Basics American default + accidental cards.** The Basics
   duration-name default flipped from British to American (`settings.svelte.js`
   `DEFAULTS.durationNames`; the per-function fallbacks stay British, so the dev
