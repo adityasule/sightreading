@@ -221,7 +221,7 @@ cleanup first, productionization last**, in small submilestones.
 
 **M2e — Progress view & manual deck top-up** ✅ shipped — see HISTORY.md.
 
-**M2f — Engineering hardening & PWA** *(productionization)*
+**M2f — Engineering hardening, bug fixes & PWA** *(productionization)*
 - Web app manifest + service worker for offline use (PWA).
 - Performance budget vs the NFRs (<200KB initial JS, <1s TTI on 4G) — code-split
   audit, confirm VexFlow stays lazy-loaded.
@@ -229,6 +229,37 @@ cleanup first, productionization last**, in small submilestones.
   boundary so a render failure never blanks the app.
 - localStorage robustness — versioned state blob + safe migration/fallback
   (covering all of `srt:phase0/1` and settings).
+- **Dev tooling — committed CDP helper.** Promote the throwaway headless-Chrome /
+  CDP script used to smoke-test M2e into a small, committed dev-only helper (e.g.
+  `scripts/drive.mjs`, beside the `render` script): a reusable connect → seed
+  `localStorage` → click-by-text → screenshot / eval API over the installed
+  Chrome. No new heavyweight deps (Node's global `WebSocket`); the browser stays
+  the source of truth for UI checks. (Considered Playwright — rejected the
+  browser-binary weight + a standing e2e suite as a mismatch with the project's
+  "verify manually, no UI tests" stance; revisit `playwright-core` only if a
+  regression suite is later wanted.)
+- **Bug fixes (carryover):**
+  - *Cap bypass should honour a per-batch cap, not go unlimited.* The M2e "Add
+    more new notes/cards" top-up sets `bypassCap = true`, which makes `next()`
+    pass `Infinity` as the new-card budget — so one click introduces *unlimited*
+    new cards for the rest of the session. Correct behaviour: each top-up grants
+    at most one more batch of `newCardsPerDay` cards (bump the effective budget by
+    `newCardsPerDay` per click via a counter, never `Infinity`), keeping the
+    setting a hard cap. Fix in both quizzes — `Phase1.svelte` *and* `Phase0.svelte`
+    share the pattern. Consider renaming `newCardsPerDay` (settings store +
+    Settings tab + `QuizSettings`) to reflect it's now also the batch size, e.g.
+    "New cards per batch".
+  - *Spread new-card introduction across clefs, not one whole clef first.* New
+    cards are introduced in `levelsFor`'s sorted `cards` order (`music.js`), whose
+    tail key is `a.midi - b.midi`. The foundation level holds both clefs' on-staff
+    naturals, so after the middle-C anchor it serves *all* bass on-staff naturals
+    (MIDI 43–57) before any treble (64–77) — one clef at a time. Correct
+    behaviour: interleave / fan out introduction across the enabled clefs and the
+    register so new cards alternate treble/bass and spread evenly. Recommended a
+    deterministic clef round-robin within each tier (preserve anchor-first and
+    on-staff-before-ledger) over a true shuffle, which would make "next card"
+    nondeterministic across `levelsFor` calls. Phase 1 only; update the M2a
+    `music.test.js` ordering expectations.
 
 **M2g — Publish as OSS**
 - *Licensing* — add an OSS license (e.g. MIT) + the year/owner line.
