@@ -17,6 +17,53 @@ const DURATION_NOTE_KEY = 'e/4';
 const REST_KEY = 'b/4';
 
 /**
+ * Horizontally centre a single formatted note/chord's *noteheads* in `stave`'s
+ * note area. Call after formatting and after `note.setStave(stave)` (so the
+ * metrics are measurable); a no-op if they aren't. Used by both the Notation
+ * (single note) and Chords (block chord) cards so their notes sit consistently.
+ *
+ * Centre on the notehead column, not the full bounding box: the latter includes
+ * any accidental (a LEFT modifier, drawn to the note's left) and would push the
+ * heads right of centre — and shift them card-to-card as the accidental comes and
+ * goes, and as a single note's stem flips up/down. We move the note's *tick
+ * context*, not its xShift: VexFlow applies xShift to the noteheads but draws a
+ * LEFT-anchored accidental at getAbsoluteX()-2 with no xShift term, so an xShift
+ * centre would strand the accidental back by the clef. Both the heads and the
+ * accidental derive their x from getAbsoluteX() → tickContext.getX(), so shifting
+ * that keeps the accidental glued to the heads (hanging just to their left).
+ *
+ * Notehead width comes from getGlyphWidth(): exact in the browser (the source of
+ * truth), but it collapses to 0 under the render script's stubbed text metrics,
+ * so there we fall back to the bounding box (font-path metrics, non-zero) just to
+ * keep the dev-render legible.
+ */
+function centerNote(stave, note) {
+  const avail = stave.getNoteEndX() - stave.getNoteStartX();
+  let left = null;
+  let w = 0;
+  try {
+    const glyphW = note.getGlyphWidth();
+    if (glyphW > 0) {
+      left = note.getNoteHeadBeginX(); // notehead column only — accidental excluded
+      w = glyphW;
+    } else {
+      const bb = note.getBoundingBox(); // headless fallback — includes the accidental
+      if (bb) {
+        left = bb.getX();
+        w = bb.getW();
+      }
+    }
+  } catch {
+    left = null; // metrics unavailable — leave left-aligned, still legible
+  }
+  if (left !== null && w > 0 && w < avail) {
+    const target = stave.getNoteStartX() + (avail - w) / 2;
+    const tc = note.getTickContext();
+    tc.setX(tc.getX() + (target - left));
+  }
+}
+
+/**
  * Render a 320×150 clef-less staff inside `element` and place a single,
  * horizontally-centered glyph on it — shared by the Basics note and rest cards
  * (duration symbols, pitch irrelevant). `makeGlyph(VexFlow)` returns the
@@ -141,10 +188,16 @@ export function drawNote(
   // The accidental in the key string sets the pitch but isn't drawn; the glyph
   // must be added explicitly.
   if (accidental) note.addModifier(new Accidental(accidental), 0);
+  // Attach the stave up front so the note's metrics are measurable before drawing
+  // (getBoundingBox throws without a stave) — needed to centre it.
+  note.setStave(stave);
   if (color) note.setStyle({ fillStyle: color, strokeStyle: color });
 
   const voice = new Voice({ numBeats: 1, beatValue: 4 }).addTickables([note]);
   new Formatter().joinVoices([voice]).format([voice], 220);
+  // Centre the note's head in the note area (matching the chord cards), so its
+  // horizontal position stays put across pitches even as the stem flips up/down.
+  centerNote(stave, note);
   voice.draw(ctx, stave);
 }
 
@@ -185,17 +238,10 @@ export function drawChord(
   const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables([note]);
   new Formatter().joinVoices([voice]).format([voice], 200);
 
-  // Centre the chord in the stave's note area — a single block chord would
-  // otherwise sit hard against the clef and overlap it (worst on low voicings
-  // with ledger lines). Same approach as the Basics centred-glyph cards.
-  const avail = stave.getNoteEndX() - stave.getNoteStartX();
-  let w = 0;
-  try {
-    w = note.getBoundingBox()?.getW() ?? 0;
-  } catch {
-    w = 0; // bbox unavailable — fall back to left-aligned, still legible
-  }
-  if (w > 0 && w < avail) note.setXShift((avail - w) / 2);
+  // A single block chord would otherwise sit hard against the clef and overlap it
+  // (worst on low voicings with ledger lines); centre its noteheads in the note
+  // area (the accidental hangs to their left). See centerNote.
+  centerNote(stave, note);
 
   voice.draw(ctx, stave);
 }
