@@ -1,6 +1,7 @@
 <script>
   import { settings } from '../lib/settings.svelte.js';
   import { buildDeck, buildBasicsDeck } from '../lib/music.js';
+  import { buildChordDeck, chordLevelsFor } from '../lib/chords.js';
   import * as srs from '../lib/spaced-repetition.js';
   import { progress, MASTER_BOX } from '../lib/progression.js';
   import { PHASES } from '../lib/phases.js';
@@ -8,12 +9,14 @@
 
   // Each phase's progress is read straight from its own srt:phaseN blob — no new
   // persistence. Loaded once (this view remounts on every navigation, like Home),
-  // then derived against the live deck so Notation tracks the clef/range settings.
+  // then derived against the live deck so Notation/Chords track the clef settings.
   const phase0State = srs.loadState('srt:phase0');
   const phase1State = srs.loadState('srt:phase1');
+  const phase2State = srs.loadState('srt:phase2');
 
   const basicsDeck = buildBasicsDeck();
   const notationDeck = $derived(buildDeck(settings));
+  const chordDeck = $derived(buildChordDeck(settings));
 
   // "Mastered" everywhere means box ≥ 2 (answered correctly on two reviews) —
   // the same bar the curriculum uses for level completion, kept consistent so a
@@ -36,6 +39,20 @@
       currentLabel: p.current?.label ?? null,
       notesMastered: srs.masteredCount(phase1State, notationDeck, MASTER_BOX),
       notesTotal: notationDeck.length,
+    };
+  });
+
+  // Chords mirrors Notation's two dimensions: how far through the circle-of-fifths
+  // key curriculum (levels fully mastered) and how many individual chords mastered.
+  const chords = $derived.by(() => {
+    const p = progress(phase2State, chordDeck, chordLevelsFor);
+    return {
+      levelsDone: p.levels.filter((l) => srs.boxAtLeast(phase2State, l.cards, MASTER_BOX))
+        .length,
+      levelsTotal: p.levels.length,
+      currentLabel: p.current?.label ?? null,
+      chordsMastered: srs.masteredCount(phase2State, chordDeck, MASTER_BOX),
+      chordsTotal: chordDeck.length,
     };
   });
 
@@ -90,6 +107,23 @@
         notation.levelsTotal
       )}
       {@render bar('Notes mastered', notation.notesMastered, notation.notesTotal)}
+    {/if}
+  </button>
+
+  <button type="button" class="card phase" onclick={() => go('phase2')}>
+    <div class="phase-head">
+      <span class="badge">Now</span>
+      <h3>{nameOf('phase2')}</h3>
+    </div>
+    {#if chords.chordsTotal === 0}
+      <p class="muted hint">No chords — enable a clef under Settings.</p>
+    {:else}
+      {@render bar(
+        chords.currentLabel ? `Key levels · ${chords.currentLabel}` : 'Key levels',
+        chords.levelsDone,
+        chords.levelsTotal
+      )}
+      {@render bar('Chords mastered', chords.chordsMastered, chords.chordsTotal)}
     {/if}
   </button>
 

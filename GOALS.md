@@ -81,16 +81,26 @@ Full scope and design in [HISTORY.md](./HISTORY.md).
 
 ### Phase 2 — Major / minor triads (next feature — M5)
 **In scope**
-- Render a 3-note chord, root position, on a single clef
-- User identifies root + quality (e.g. "C major", "A minor")
-- Coverage: common keys (C, G, D, F major; A, E, D minor)
-- Spaced repetition per chord card
+- Render a 3-note major or minor triad on a single staff, in a **randomised
+  voicing** each showing — root position + 1st/2nd inversion, at a varied
+  register (bounded to ~2–3 ledger lines of the staff)
+- User identifies **root + quality** (e.g. "C major", "A minor") by **multiple
+  choice** — the chord is recognised regardless of how it's voiced/inverted
+- Coverage: every circle-of-fifths key's tonic-major + relative-minor triad
+  (11 levels), **introduced in circle-of-fifths order**, paired into levels like
+  the Notation scale curriculum
+- Render on the enabled clefs (reuses the treble/bass setting); a card per
+  `(clef, root, quality)`, voicing chosen at render time
+- Spaced repetition per chord card; circle-of-fifths progression with the same
+  gate as Notation (reuses the generic scheduler + the now curriculum-pluggable
+  `progression.js`)
 
 **Out of scope (Phase 2)**
-- Inversions
+- Naming the inversion (inversions are shown for recognition, not quizzed)
 - 7th chords or extensions
 - Diminished / augmented qualities
 - Chords spanning both clefs
+- Diatonic triads within a key (see Future ideas)
 
 ### Phase 3 — Key signature recognition (M6)
 **In scope**
@@ -244,8 +254,27 @@ integration) at `sightreading.adityasule.com`; `public/_headers` cache rules liv
 a11y flag is carried to M5.
 
 ### Milestone 5 — Phase 2 (chords) + carried-over tasks
-- **Phase 2 (chords)** — the feature; full scope under Phases → Phase 2 above.
-- **Self-host the music font** *(moved from M2f; offline prerequisite).* The app
+Sequenced feature-first, productionization last (the M2 precedent). Split into
+serializable sub-milestones:
+
+- **M5a — Chord engine** ✅ *(this milestone).* `src/lib/chords.js`: the
+  circle-of-fifths `CHORD_SEQUENCE` (11 levels, tonic-major + relative-minor),
+  `buildChordDeck`, correct triad spelling + the inversion/register voicing
+  (`chordTones`/`chordVoicing`/`chordPlacements`/`pickVoicing`), `chordLevelsFor`,
+  labels + option pool. `progression.js` generalised with an optional
+  `levelsFn` (default `levelsFor`) so the gate drives chords unchanged. +22 tests
+  (110 total).
+- **M5b — Chord rendering** ✅ *(this milestone).* `drawChord` in `render.js`
+  (multi-key block chord, per-index accidentals, centred); `npm run render --
+  chord` for SVG iteration.
+- **M5c — Dev card gallery** ✅ *(this milestone; dev-only, never shipped).*
+  `src/dev/CardGallery.svelte` — browse every Basics/Notation/Chords card,
+  gated behind `import.meta.env.DEV` via a dynamic import (tree-shaken from prod).
+- **M5d — Chords quiz view** ✅ *(this milestone).* `Phase2.svelte` on the
+  Phase 0/1 shell (scheduler, relearning, gate, top-up, `Choices` pad, frozen
+  per-presentation voicing); `phase2` flipped ready; Progress gains a Chords
+  two-bar split. Full scope under Phases → Phase 2 above.
+- **M5e — Self-host the music font** *(moved from M2f; offline prerequisite).* The app
   dynamic-imports the default `vexflow` build, which fetches the Bravura music font
   from a third-party CDN mid-render (root cause of the M1c first-paint bug) — a
   runtime third-party call at odds with the no-runtime-API constraint, *and* the
@@ -258,13 +287,13 @@ a11y flag is carried to M5.
   lands the deployed app fetches the font from a CDN (fine online, broken offline)
   — acceptable through M4, since offline isn't considered until after the first
   deploy. **Prerequisite for the PWA task below.**
-- **PWA (manifest + service worker)** *(moved from M2f; nice-to-have per NFRs, not
-  blocking).* Web app manifest + a service worker that precaches the app shell and
+- **M5g — PWA (manifest + service worker)** *(moved from M2f; nice-to-have per NFRs,
+  not blocking; depends on M5e).* Web app manifest + a service worker that precaches the app shell and
   the lazy VexFlow chunk for offline use. Relies on the font self-hosting task
   above (no runtime CDN fetch), so offline is genuinely offline by the time this
   lands. Keep the worker conservative about staleness (versioned precache or
   network-first for the HTML) so a deploy is never pinned by a stale cached worker.
-- **Dev tooling — committed CDP helper** *(moved from M2f; independent of feature
+- **M5h — Dev tooling: committed CDP helper** *(moved from M2f; independent of feature
   work).* Promote the throwaway headless-Chrome / CDP script used to smoke-test M2e
   into a small, committed dev-only helper (e.g. `scripts/drive.mjs`, beside the
   `render` script): a reusable connect → seed `localStorage` → click-by-text →
@@ -273,7 +302,7 @@ a11y flag is carried to M5.
   (Considered Playwright — rejected the browser-binary weight + a standing e2e
   suite as a mismatch with the project's "verify manually, no UI tests" stance;
   revisit `playwright-core` only if a regression suite is later wanted.)
-- **Accessibility — fix Home-view contrast** *(found in M4's Lighthouse run;
+- **M5f — Accessibility: fix Home-view contrast** *(found in M4's Lighthouse run;
   a11y 94 → ~100).* The teal accent `#0d9488` fails WCAG AA as small text on
   light-teal badges/level-tags (3.3:1) and as white-on-teal primary buttons
   (3.7:1), and the "Soon" badge gray is 4.39:1. Darken the accent/muted theme
@@ -286,6 +315,8 @@ a11y flag is carried to M5.
 - Optional MIDI input (Web MIDI API)
 - Progress export/import as JSON
 - Relative-minor identification in Phase 3
+- Diatonic triads within a key (Phase 2 extension — the I/ii/iii/IV/V/vi triads
+  per key, teaching chords-in-context rather than isolated triad recognition)
 
 ---
 

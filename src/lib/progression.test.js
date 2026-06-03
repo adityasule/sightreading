@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { progress, advance, MASTER_BOX } from './progression.js';
 import { buildDeck, levelsFor } from './music.js';
+import { buildChordDeck, chordLevelsFor } from './chords.js';
 
 // A small but multi-level deck: treble, on-staff naturals + the five black-key
 // home-key levels. Skips the foundation-ledger level (no ledger naturals at
@@ -125,5 +126,35 @@ describe('seedUnlocked — pre-M1d migration', () => {
     master(s, DECK);
     progress(s, DECK);
     expect(s.unlocked).toBe(LEVELS[LEVELS.length - 1].index);
+  });
+});
+
+// The progression layer is curriculum-agnostic: handed `chordLevelsFor` it
+// drives Phase 2's circle-of-fifths chord levels exactly as it drives Phase 1's
+// scales, with no scheduler/progression changes.
+describe('generalized levelsFn — Phase 2 chord curriculum', () => {
+  const CHORD_DECK = buildChordDeck({ treble: true, bass: true });
+  const CHORD_LEVELS = chordLevelsFor(CHORD_DECK);
+
+  it('seeds a fresh user onto chord level 0 and pools its cards', () => {
+    const s = { cards: {} };
+    const p = progress(s, CHORD_DECK, chordLevelsFor);
+    expect(s.unlocked).toBe(0);
+    expect(p.current.index).toBe(0);
+    expect(p.current.label).toBe('C major / A minor');
+    expect(p.pool).toEqual(CHORD_LEVELS[0].cards);
+    expect(p.total).toBe(4); // 2 chords × 2 clefs
+    expect(p.next.index).toBe(1);
+  });
+
+  it('advances to the next chord level once the current is mastered', () => {
+    const s = { cards: {}, unlocked: 0 };
+    for (const c of CHORD_LEVELS[0].cards) s.cards[c.id] = { box: MASTER_BOX, dueAt: 0 };
+    const p = progress(s, CHORD_DECK, chordLevelsFor);
+    expect(p.complete).toBe(true);
+    expect(p.canAdvance).toBe(true);
+    advance(s, CHORD_DECK, chordLevelsFor);
+    expect(s.unlocked).toBe(1);
+    expect(progress(s, CHORD_DECK, chordLevelsFor).current.index).toBe(1);
   });
 });

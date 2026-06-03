@@ -19,8 +19,8 @@ export const PHASES = [
   {
     id: 'phase2',
     name: 'Chords',
-    blurb: 'Identify major / minor three-note chords.',
-    ready: false,
+    blurb: 'Identify major & minor triads — multiple choice.',
+    ready: true,
   },
   {
     id: 'phase3',

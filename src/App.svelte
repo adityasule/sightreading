@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import Home from './views/Home.svelte';
   import Phase0 from './views/Phase0.svelte';
   import Phase1 from './views/Phase1.svelte';
@@ -13,12 +14,29 @@
   // Phase labels come from the shared config; Home/Settings/etc. wraps it so a
   // rename lives in one place. Internal route ids are untouched.
   const components = { phase0: Phase0, phase1: Phase1, phase2: Phase2, phase3: Phase3 };
-  const views = [
-    { id: 'home', label: 'Home', component: Home },
-    ...PHASES.map((p) => ({ id: p.id, label: p.name, component: components[p.id] })),
-    { id: 'progress', label: 'Progress', component: Progress },
-    { id: 'settings', label: 'Settings', component: Settings },
-  ];
+
+  // Dev-only "Cards" gallery: loaded via a dynamic import gated on import.meta.env.DEV
+  // (statically `false` in a production build, so Rollup drops both the import and
+  // the nav entry — it never ships). Available only under `npm run dev`.
+  let galleryComponent = $state(null);
+  onMount(async () => {
+    if (import.meta.env.DEV) {
+      galleryComponent = (await import('./dev/CardGallery.svelte')).default;
+    }
+  });
+
+  let views = $derived.by(() => {
+    const list = [
+      { id: 'home', label: 'Home', component: Home },
+      ...PHASES.map((p) => ({ id: p.id, label: p.name, component: components[p.id] })),
+      { id: 'progress', label: 'Progress', component: Progress },
+    ];
+    if (import.meta.env.DEV && galleryComponent) {
+      list.push({ id: 'cards', label: 'Cards (dev)', component: galleryComponent });
+    }
+    list.push({ id: 'settings', label: 'Settings', component: Settings });
+    return list;
+  });
 
   let active = $derived(views.find((v) => v.id === nav.active) ?? views[0]);
   const ActiveComponent = $derived(active.component);

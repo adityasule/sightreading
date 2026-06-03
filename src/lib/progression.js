@@ -35,7 +35,10 @@ function seedUnlocked(state, levels) {
 /**
  * Resolve the live progression view for `state` against `deck`. Seeds (and
  * persists onto the blob) `unlocked` on first call, so callers should
- * `saveState` after if they care to keep a freshly-migrated pointer. Returns:
+ * `saveState` after if they care to keep a freshly-migrated pointer. `levelsFn`
+ * is the curriculum bucketer — `levelsFor` (Phase 1 scales) by default, or
+ * `chordLevelsFor` for Phase 2; both return `{ index, cards, … }` levels in
+ * order, so this layer stays curriculum-agnostic. Returns:
  *   levels        all present levels, in order
  *   current       the level new cards are introduced from now (null if deck empty)
  *   pool          current.cards — pass straight to pickNext as its newPool
@@ -44,8 +47,8 @@ function seedUnlocked(state, levels) {
  *   next          the level the gate would unlock, or null
  *   canAdvance    complete && next exists → show the "Start next level?" gate
  */
-export function progress(state, deck) {
-  const levels = levelsFor(deck);
+export function progress(state, deck, levelsFn = levelsFor) {
+  const levels = levelsFn(deck);
   if (levels.length === 0) {
     return {
       levels, current: null, pool: [], mastered: 0, total: 0,
@@ -89,8 +92,9 @@ export function progress(state, deck) {
 /**
  * Accept the gate: unlock the next level. No-op if there's nothing to unlock.
  * The caller is responsible for persisting the blob (`saveState`) afterwards.
+ * `levelsFn` must match the one passed to `progress` for this phase.
  */
-export function advance(state, deck) {
-  const { next } = progress(state, deck);
+export function advance(state, deck, levelsFn = levelsFor) {
+  const { next } = progress(state, deck, levelsFn);
   if (next) state.unlocked = next.index;
 }

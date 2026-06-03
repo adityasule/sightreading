@@ -147,3 +147,55 @@ export function drawNote(
   new Formatter().joinVoices([voice]).format([voice], 220);
   voice.draw(ctx, stave);
 }
+
+/**
+ * Draw a Phase 2 (Chords) triad: the `keys` array (e.g. ['e/4','g#/4','b/4'],
+ * low→high as VexFlow expects) on the given `clef`, with `accidentals` as
+ * `[{ index, type }]` where `index` is the notehead's position in `keys` and
+ * `type` is '#' | 'b'. Drawn as a whole-note "block chord" (open noteheads, no
+ * stem) — the clearest read for chord identification, and stem-direction-free
+ * across registers. `ledgerLines` sizes the vertical margin so inverted / high /
+ * low voicings aren't clipped (a chord can reach ~2–3 ledger lines either way);
+ * `color` tints the noteheads for answer feedback. The voicing itself comes from
+ * `chordVoicing` in chords.js, so this stays a pure draw step.
+ */
+export function drawChord(
+  VexFlow,
+  element,
+  { clef, keys, accidentals = [], ledgerLines = 3, color = null } = {}
+) {
+  const { Renderer, Stave, StaveNote, Accidental, Formatter, Voice } = VexFlow;
+  element.innerHTML = '';
+  const renderer = new Renderer(element, Renderer.Backends.SVG);
+  const margin = 44 + ledgerLines * 12;
+  renderer.resize(320, margin * 2 + 44);
+  const ctx = renderer.getContext();
+
+  const stave = new Stave(10, margin, 300).addClef(clef);
+  stave.setContext(ctx).draw();
+
+  const note = new StaveNote({ clef, keys, duration: 'w' });
+  // Each altered notehead gets its glyph by key index; naturals are omitted.
+  for (const { index, type } of accidentals) note.addModifier(new Accidental(type), index);
+  // Attach the stave up front so the bounding box is measurable before drawing
+  // (getBoundingBox throws without a stave) — needed to centre the chord.
+  note.setStave(stave);
+  if (color) note.setStyle({ fillStyle: color, strokeStyle: color });
+
+  const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables([note]);
+  new Formatter().joinVoices([voice]).format([voice], 200);
+
+  // Centre the chord in the stave's note area — a single block chord would
+  // otherwise sit hard against the clef and overlap it (worst on low voicings
+  // with ledger lines). Same approach as the Basics centred-glyph cards.
+  const avail = stave.getNoteEndX() - stave.getNoteStartX();
+  let w = 0;
+  try {
+    w = note.getBoundingBox()?.getW() ?? 0;
+  } catch {
+    w = 0; // bbox unavailable — fall back to left-aligned, still legible
+  }
+  if (w > 0 && w < avail) note.setXShift((avail - w) / 2);
+
+  voice.draw(ctx, stave);
+}

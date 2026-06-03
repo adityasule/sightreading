@@ -15,6 +15,8 @@
 //   npm run render -- note half.    # the dotted-half note
 //   npm run render -- phase1        # a representative Phase 1 (Notation) set
 //   npm run render -- phase1 treble:60   # one Phase 1 card, by id
+//   npm run render -- chord         # a representative Phase 2 (Chords) set, each inversion
+//   npm run render -- chord treble:Bb:major  # one chord (all inversions), by id/key
 //   npm run render -- quarter       # shorthand: a Basics card by key/value/id
 //   npm run render -- --feedback    # tint as a correct answer (combine w/ above)
 //
@@ -55,7 +57,12 @@ dom.window.HTMLCanvasElement.prototype.getContext = () => noopCtx;
 // vexflow/bravura = VexFlow with Bravura + Academico bundled (no CDN fetch).
 const VexFlow = await import('vexflow/bravura');
 const { buildBasicsDeck, buildDeck, basicsLabel } = await import(join(root, 'src/lib/music.js'));
-const { drawDurationNote, drawRest, drawClef, drawNote } = await import(join(root, 'src/lib/render.js'));
+const { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } = await import(
+  join(root, 'src/lib/chords.js')
+);
+const { drawDurationNote, drawRest, drawClef, drawNote, drawChord } = await import(
+  join(root, 'src/lib/render.js')
+);
 
 // The bundled font module is literally `export const Bravura = 'data:font/woff2…'`.
 const bravuraModule = readFileSync(
@@ -79,7 +86,9 @@ function selfContained(svg) {
 }
 
 // A filename-safe slug from a card id (e.g. 'dur:half:dot' → 'dur-half-dot').
-const slug = (s) => s.replace(/[^a-z0-9]+/gi, '-');
+// '#' → 's' first so a sharp root/spelling stays distinct from its natural
+// ('G#' vs 'G') instead of both collapsing to the same name; flats keep their 'b'.
+const slug = (s) => s.replace(/#/g, 's').replace(/[^a-z0-9]+/gi, '-');
 
 // Draw a Basics card to `el`, routed by type through the shared render.js — the
 // same dispatch the Basics view uses.
@@ -93,12 +102,16 @@ function drawBasicsCard(el, card, color) {
 // sharp and a flat (all present in the default ±2-ledger deck).
 const PHASE1_SAMPLE = ['treble:60', 'bass:60', 'treble:61:#', 'treble:66:b'];
 
+// Representative Phase 2 chords when no id is given: a natural major + minor, a
+// sharp major, a flat major, and one on bass — each rendered in all inversions.
+const CHORD_SAMPLE = ['treble:C:major', 'treble:A:minor', 'treble:E:major', 'treble:Bb:major', 'bass:C:major'];
+
 const args = process.argv.slice(2);
 const feedback = args.includes('--feedback');
 const color = feedback ? '#16a34a' : null;
 const positionals = args.filter((a) => !a.startsWith('-'));
 
-const KINDS = new Set(['basics', 'note', 'rest', 'clef', 'phase1']);
+const KINDS = new Set(['basics', 'note', 'rest', 'clef', 'phase1', 'chord']);
 let kind, filter;
 if (positionals[0] && KINDS.has(positionals[0])) {
   [kind, filter] = positionals;
@@ -125,6 +138,25 @@ if (kind === 'phase1') {
         color,
       }),
   }));
+} else if (kind === 'chord') {
+  const deck = buildChordDeck({ treble: true, bass: true });
+  const cards = filter
+    ? deck.filter((c) => c.id === filter || c.key === filter)
+    : deck.filter((c) => CHORD_SAMPLE.includes(c.id));
+  // One SVG per (chord, inversion); pick the lowest in-window octave for a stable
+  // register (the app randomises it — here we want deterministic, eyeballable output).
+  renderables = cards.flatMap((card) =>
+    INVERSIONS.map((inversion) => {
+      const fit = chordPlacements(card).find((p) => p.inversion === inversion);
+      const octave = fit ? fit.octave : 4;
+      const { keys, accidentals } = chordVoicing(card, inversion, octave);
+      return {
+        label: `${card.name} (${card.clef}, inv ${inversion})`,
+        file: `chord-${slug(card.id)}-inv${inversion}.svg`,
+        draw: (el) => drawChord(VexFlow, el, { clef: card.clef, keys, accidentals, color }),
+      };
+    })
+  );
 } else {
   let cards = buildBasicsDeck();
   if (kind !== 'basics') cards = cards.filter((c) => c.type === kind);
@@ -139,7 +171,7 @@ if (kind === 'phase1') {
 if (renderables.length === 0) {
   console.error(
     `Nothing to render for "${positionals.join(' ') || '(all)'}".\n` +
-      `Kinds: note | rest | clef | phase1 (or a Basics key/value/id).`
+      `Kinds: note | rest | clef | phase1 | chord (or a Basics key/value/id).`
   );
   process.exit(1);
 }
