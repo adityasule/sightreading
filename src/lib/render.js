@@ -2,10 +2,12 @@
 // `render` dev script — so the SVG the script emits is drawn through the exact
 // same code that ships, and can't drift from what the user actually sees.
 //
-// Covers every glyph the project draws: the Basics (Phase 0) note / rest / clef
-// cards and the Phase 1 (Notation) single note. Each function is given the
-// `VexFlow` module rather than importing it: the app dynamic-imports it (CDN-font
-// build, lazy-loaded chunk) while the script imports the font-bundled build.
+// Covers every glyph the project draws: the Basics (Phase 0) note / rest / clef /
+// accidental cards, the Phase 1 (Notation) single note, and the Phase 2 (Chords)
+// triad. Each function is given the
+// `VexFlow` module rather than importing it: both the app and the script
+// dynamic-import the font-bundled `vexflow/bravura` build (Bravura + Academico
+// embedded as data URIs — no runtime CDN fetch; M5e), the app as a lazy chunk.
 // Keeping this module VexFlow-free also means importing it never pulls VexFlow
 // into a bundle that didn't already have it.
 
@@ -138,6 +140,33 @@ export function drawRest(VexFlow, element, { duration, color = null } = {}) {
     element,
     ({ StaveNote }) =>
       new StaveNote({ clef: 'treble', keys: [REST_KEY], duration: `${duration}r` }),
+    color
+  );
+}
+
+// SMuFL codepoints for the accidental glyphs the Basics cards name. Hardcoded
+// because VexFlow's `Glyphs` enum isn't re-exported from the package entry, and
+// these codepoints are part of the stable SMuFL standard. Keyed by the same
+// VexFlow accidental type code the cards carry ('#' | 'b' | 'n').
+const ACCIDENTAL_GLYPHS = {
+  '#': '\uE262', // accidentalSharp
+  b: '\uE260', // accidentalFlat
+  n: '\uE261', // accidentalNatural
+};
+
+/**
+ * Draw a lone accidental glyph (`type`: '#' | 'b' | 'n') centred on a clef-less
+ * staff inside `element` — the Basics accidental cards (symbol recognition; the
+ * glyph names an accidental, never a pitch). Rendered via `GlyphNote` (a
+ * notehead-less tickable) through the shared `drawCenteredGlyph`, so it centres
+ * and tints like the note/rest cards. `color` tints it for feedback.
+ */
+export function drawAccidental(VexFlow, element, { type, color = null } = {}) {
+  drawCenteredGlyph(
+    VexFlow,
+    element,
+    ({ GlyphNote }) =>
+      new GlyphNote(ACCIDENTAL_GLYPHS[type], { duration: 'w' }, { line: 2 }),
     color
   );
 }

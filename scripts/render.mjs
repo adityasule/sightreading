@@ -11,6 +11,7 @@
 //   npm run render -- note          # just the note cards (incl. dotted)
 //   npm run render -- rest          # just the rest cards
 //   npm run render -- clef          # just the clef cards
+//   npm run render -- accidental    # just the accidental cards (sharp/flat/natural)
 //   npm run render -- rest quarter  # one card, by key/value (or id)
 //   npm run render -- note half.    # the dotted-half note
 //   npm run render -- phase1        # a representative Phase 1 (Notation) set
@@ -60,7 +61,7 @@ const { buildBasicsDeck, buildDeck, basicsLabel } = await import(join(root, 'src
 const { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } = await import(
   join(root, 'src/lib/chords.js')
 );
-const { drawDurationNote, drawRest, drawClef, drawNote, drawChord } = await import(
+const { drawDurationNote, drawRest, drawClef, drawAccidental, drawNote, drawChord } = await import(
   join(root, 'src/lib/render.js')
 );
 
@@ -95,6 +96,7 @@ const slug = (s) => s.replace(/#/g, 's').replace(/[^a-z0-9]+/gi, '-');
 function drawBasicsCard(el, card, color) {
   if (card.type === 'rest') drawRest(VexFlow, el, { duration: card.vex, color });
   else if (card.type === 'clef') drawClef(VexFlow, el, { clef: card.clef }); // no tint
+  else if (card.type === 'accidental') drawAccidental(VexFlow, el, { type: card.vex, color });
   else drawDurationNote(VexFlow, el, { duration: card.vex, dotted: card.dotted, color });
 }
 
@@ -111,7 +113,7 @@ const feedback = args.includes('--feedback');
 const color = feedback ? '#16a34a' : null;
 const positionals = args.filter((a) => !a.startsWith('-'));
 
-const KINDS = new Set(['basics', 'note', 'rest', 'clef', 'phase1', 'chord']);
+const KINDS = new Set(['basics', 'note', 'rest', 'clef', 'accidental', 'phase1', 'chord']);
 let kind, filter;
 if (positionals[0] && KINDS.has(positionals[0])) {
   [kind, filter] = positionals;
@@ -171,7 +173,7 @@ if (kind === 'phase1') {
 if (renderables.length === 0) {
   console.error(
     `Nothing to render for "${positionals.join(' ') || '(all)'}".\n` +
-      `Kinds: note | rest | clef | phase1 | chord (or a Basics key/value/id).`
+      `Kinds: note | rest | clef | accidental | phase1 | chord (or a Basics key/value/id).`
   );
   process.exit(1);
 }
