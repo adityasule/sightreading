@@ -12,6 +12,8 @@ import {
   stats,
   cardStats,
   aggregateStats,
+  rawTotals,
+  statsFromTotals,
 } from './spaced-repetition.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -168,6 +170,54 @@ describe('aggregateStats', () => {
       },
     };
     expect(aggregateStats(s)).toEqual({ accuracy: 100, avgMs: 1000 });
+  });
+});
+
+describe('rawTotals / statsFromTotals', () => {
+  it('returns zeroed totals for an empty / missing card map', () => {
+    expect(rawTotals({ cards: {} })).toEqual({ seen: 0, correct: 0, timeMs: 0 });
+    expect(rawTotals({})).toEqual({ seen: 0, correct: 0, timeMs: 0 });
+  });
+
+  it('sums the running totals across cards, skipping absent fields', () => {
+    const s = {
+      cards: {
+        a: { box: 2, dueAt: 0 }, // pre-M7a, no aggregates
+        b: { seen: 2, correct: 1, timeMs: 6000 },
+        c: { seen: 2, correct: 2, timeMs: 2000 },
+      },
+    };
+    expect(rawTotals(s)).toEqual({ seen: 4, correct: 3, timeMs: 8000 });
+  });
+
+  it('statsFromTotals rounds once at the end (null until any answer)', () => {
+    expect(statsFromTotals({ seen: 0, correct: 0, timeMs: 0 })).toEqual({
+      accuracy: null,
+      avgMs: null,
+    });
+    // 2/3 = 66.6…% → 67; 5000/3 = 1666.6… → 1667
+    expect(statsFromTotals({ seen: 3, correct: 2, timeMs: 5000 })).toEqual({
+      accuracy: 67,
+      avgMs: 1667,
+    });
+  });
+
+  it('combines phases by raw totals, not by averaging their percentages', () => {
+    // Phase A: 1/1 = 100%. Phase B: 1/9 ≈ 11%. Averaging the two percentages
+    // would give ~56%, but the honest figure weights by volume: 2/10 = 20%.
+    const a = { cards: { x: { seen: 1, correct: 1, timeMs: 1000 } } };
+    const b = { cards: { y: { seen: 9, correct: 1, timeMs: 9000 } } };
+    const combined = [a, b].reduce(
+      (acc, st) => {
+        const t = rawTotals(st);
+        acc.seen += t.seen;
+        acc.correct += t.correct;
+        acc.timeMs += t.timeMs;
+        return acc;
+      },
+      { seen: 0, correct: 0, timeMs: 0 }
+    );
+    expect(statsFromTotals(combined)).toEqual({ accuracy: 20, avgMs: 1000 });
   });
 });
 

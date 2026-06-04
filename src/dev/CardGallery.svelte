@@ -7,10 +7,17 @@
   import { onMount } from 'svelte';
   import { settings } from '../lib/settings.svelte.js';
   import { buildBasicsDeck, basicsLabel, buildDeck } from '../lib/music.js';
-  import { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } from '../lib/chords.js';
+  import { buildChordDeck } from '../lib/chords.js';
   import { buildKeySigDeck } from '../lib/keysig.js';
   import { buildIntervalDeck, intervalPlacements } from '../lib/intervals.js';
+  // The render harness (font boot, the `staff` action, the draw fns, the
+  // representative-voicing pick) is shared with the production Progress drill-down
+  // via cardRender.js, so the two views can't drift in how a card is drawn.
   import {
+    loadVex,
+    staff,
+    chordVoicingFor,
+    INVERSIONS,
     drawDurationNote,
     drawRest,
     drawClef,
@@ -19,7 +26,7 @@
     drawChord,
     drawKeySignature,
     drawInterval,
-  } from '../lib/render.js';
+  } from '../lib/cardRender.js';
 
   const TABS = [
     { id: 'phase0', label: 'Basics' },
@@ -41,13 +48,6 @@
   }
 
   const INV_LABEL = { 0: 'root', 1: '1st inv', 2: '2nd inv' };
-
-  // A representative octave for an inversion in the gallery: the lowest in-window
-  // one, so the register is stable to scan (the quiz randomises it per show).
-  function galleryVoicing(card, inversion) {
-    const fit = chordPlacements(card).find((p) => p.inversion === inversion);
-    return chordVoicing(card, inversion, fit ? fit.octave : 4);
-  }
 
   // Display groups for the active tab. A group is { heading, chord, cells } where
   // a cell is { label, draw }. Basics/Notation get one heading-less group; Chords
@@ -133,7 +133,7 @@
       heading: `${card.name} · ${card.clef}`,
       chord: true,
       cells: INVERSIONS.map((inv) => {
-        const { keys, accidentals } = galleryVoicing(card, inv);
+        const { keys, accidentals } = chordVoicingFor(card, inv);
         return {
           label: INV_LABEL[inv],
           draw: (el) => drawChord(vex, el, { clef: card.clef, keys, accidentals }),
@@ -144,57 +144,8 @@
 
   let count = $derived(groups.reduce((n, g) => n + g.cells.length, 0));
 
-  // Make a freshly-drawn VexFlow SVG scale to its cell: give it a viewBox from its
-  // fixed width/height, then let CSS size it responsively.
-  function fit(node) {
-    const svg = node.querySelector('svg');
-    if (!svg) return;
-    const w = svg.getAttribute('width');
-    const h = svg.getAttribute('height');
-    if (w && h && !svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    svg.removeAttribute('width');
-    svg.removeAttribute('height');
-    svg.style.width = '100%';
-    svg.style.height = 'auto';
-  }
-
-  // Action: draw a cell into its node once VexFlow is ready, and redraw when the
-  // params change (tab switch, settings reshape, or the font finishing loading).
-  function staff(node, params) {
-    const run = (p) => {
-      if (p.ready) {
-        p.draw(node);
-        fit(node);
-      }
-    };
-    run(params);
-    return { update: run };
-  }
-
   onMount(async () => {
-    // The `/bravura` build bundles the music font as data URIs — no runtime CDN
-    // fetch (M5e); `document.fonts.load` then awaits the registered FontFaces
-    // without re-fetching (unlike `VexFlow.loadFonts`).
-    const m = await import('vexflow/bravura');
-    try {
-      await Promise.all([
-        document.fonts.load("1em 'Bravura'"),
-        document.fonts.load("1em 'Academico'"),
-      ]);
-    } catch {
-      /* no FontFace API (or load failed) — render anyway */
-    }
-    vex = {
-      Renderer: m.Renderer,
-      Stave: m.Stave,
-      StaveNote: m.StaveNote,
-      Accidental: m.Accidental,
-      GlyphNote: m.GlyphNote,
-      Dot: m.Dot,
-      Formatter: m.Formatter,
-      Voice: m.Voice,
-      KeySignature: m.KeySignature,
-    };
+    vex = await loadVex();
   });
 </script>
 

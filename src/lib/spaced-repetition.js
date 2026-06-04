@@ -241,11 +241,12 @@ export function cardStats(state, cardId) {
 }
 
 /**
- * Phase-wide answer aggregates (M7b's general metrics), summing every card's
- * running totals: average accuracy (%) and average time-to-answer (ms), each
- * null until at least one answer is recorded.
+ * Raw (unrounded) sums of every card's running totals: { seen, correct, timeMs }.
+ * The combinable primitive — sum these across phases for an app-wide figure, then
+ * round once. (Averaging the per-phase percentages instead would mis-weight phases
+ * with different seen-counts.) Backs `aggregateStats`.
  */
-export function aggregateStats(state) {
+export function rawTotals(state) {
   let seen = 0;
   let correct = 0;
   let timeMs = 0;
@@ -255,6 +256,24 @@ export function aggregateStats(state) {
     correct += c.correct ?? 0;
     timeMs += c.timeMs ?? 0;
   }
+  return { seen, correct, timeMs };
+}
+
+/**
+ * Phase-wide answer aggregates (M7b's general metrics) from a single state's
+ * running totals: average accuracy (%) and average time-to-answer (ms), each
+ * null until at least one answer is recorded.
+ */
+export function aggregateStats(state) {
+  return statsFromTotals(rawTotals(state));
+}
+
+/**
+ * Reduce raw totals ({ seen, correct, timeMs }) to { accuracy, avgMs }, rounding
+ * once at the end. Shared by `aggregateStats` and the app-wide band, which sums
+ * `rawTotals` across phases before calling this.
+ */
+export function statsFromTotals({ seen, correct, timeMs }) {
   return {
     accuracy: seen ? Math.round((correct / seen) * 100) : null,
     avgMs: seen ? Math.round(timeMs / seen) : null,

@@ -326,10 +326,10 @@ engine module + a view + a render fn + wiring, the Chords (M5a–d) precedent. S
 **M6b — Interval training** ✅ shipped — see HISTORY.md.
 
 ### Milestone 7 — Refinement
-A polish/refinement pass: a richer behaviour (Progress) view backed by new
+A polish/refinement pass: a richer Progress (stats) view backed by new
 per-card analytics, state export/import, an attribution footer, the PWA, and a
 docs cleanup. Sequenced **feature/enabler first, productionization last** (the
-M2/M5 precedent): the analytics enabler unblocks the behaviour page, then
+M2/M5 precedent): the analytics enabler unblocks the Progress stats redesign, then
 export/import, footer, PWA, and the docs close-out.
 
 **M7a — Per-card stats instrumentation (enabler) ✅ shipped.** The behaviour page
@@ -347,17 +347,24 @@ aggregate. This slice adds the data:
 - Bump `STATE_VERSION` with a forward migration (existing cards default the new
   fields to 0/absent — go-forward only, no backfill). Unit tests.
 
-**M7b — Behaviour page (Progress redesign + Cards merge).** Rework the Progress
-view into the behaviour page:
-- **Overview** keeps the existing per-phase progress bars and adds two general
-  metrics — **average accuracy** and **average time to answer** (from M7a).
-- **Drill-down**: clicking a category opens a detail view of **every possible
-  card** in it; each card shows whether it's been **introduced to the deck**,
-  plus its **average accuracy** and **average time to answer**, rendered as a
-  **glyph + stats grid** — each card's actual staff glyph drawn via the shared
-  `render.js`. This folds the dev card gallery's "browse every card" into the
-  production view. The dev **Cards (dev)** gallery stays `import.meta.env.DEV`-
-  gated for raw render iteration (still useful, never shipped).
+**M7b — Progress stats redesign + Cards merge ✅ shipped.** Reworked the Progress
+view to surface the M7a per-card aggregates (nav tab stays "Progress"):
+- **Overview** keeps the per-phase progress bars and adds an **app-wide metrics
+  band** — **average accuracy** and **average time to answer** summed from each
+  phase's raw totals (so the figure weights by answer volume, not by averaging the
+  five per-phase percentages). New `rawTotals`/`statsFromTotals` in
+  `spaced-repetition.js`, with `aggregateStats` refactored onto them.
+- **Drill-down**: clicking a phase card opens a detail view of **every possible
+  card** in it; each shows whether it's been **introduced to the deck**, its
+  **average accuracy** and **average time to answer**, as a **glyph + stats grid**
+  (un-introduced cards dimmed), plus the phase aggregate and a **Practice** jump.
+  Each card's real staff glyph draws via the shared `render.js`.
+- **Shared render harness** — the dev gallery's VexFlow boot + draw dispatch moved
+  to `src/lib/cardRender.js` (`loadVex`, the `staff` action, representative
+  voicing/interval pickers, `drawForCard`), so the production drill-down and the
+  dev **Cards (dev)** gallery draw through the *same* path (output can't drift).
+  VexFlow boots lazily on the first drill-down. The dev gallery stays
+  `import.meta.env.DEV`-gated for raw render iteration (still useful, never shipped).
 
 **M7c — Export / import state + state-efficiency audit.** The opt-in
 export/import escape hatch GOALS has always reserved for cross-device transfer:
