@@ -19,7 +19,7 @@ const STORAGE_KEY = 'srt:settings';
 
 // Persisted-blob schema version (see spaced-repetition.js for the rationale): a
 // blob from a newer app falls back to defaults rather than being misread.
-const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 1;
 
 export const LEDGER_MIN = 0;
 export const LEDGER_MAX = 4;

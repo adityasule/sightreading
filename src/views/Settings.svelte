@@ -8,6 +8,12 @@
     LEDGER_MIN,
     LEDGER_MAX,
   } from '../lib/settings.svelte.js';
+  import {
+    buildExport,
+    triggerDownload,
+    parseAndValidate,
+    applyImport,
+  } from '../lib/transfer.js';
 
   const answerModes = [
     { value: 'letters', label: 'Letters' },
@@ -18,6 +24,44 @@
     { value: 'british', label: 'British' },
     { value: 'american', label: 'American' },
   ];
+
+  // Backup & transfer (M7c) — export downloads all srt:* keys as one JSON file;
+  // import validates, confirms, writes back, then reloads so every reactive
+  // store re-reads from storage.
+  let fileInput;
+  let status = $state(null); // { kind: 'info' | 'error', message } | null
+
+  function handleExport() {
+    triggerDownload(buildExport());
+    status = { kind: 'info', message: 'Progress exported.' };
+  }
+
+  async function handleImport(e) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = ''; // reset so re-picking the same file re-fires change
+    if (!file) return;
+
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      status = { kind: 'error', message: 'Could not read that file.' };
+      return;
+    }
+
+    const result = parseAndValidate(text);
+    if (!result.ok) {
+      status = { kind: 'error', message: result.error };
+      return;
+    }
+    if (!confirm('Import will replace all progress and settings on this device. Continue?')) {
+      status = null;
+      return;
+    }
+    applyImport(result.data);
+    location.reload();
+  }
 </script>
 
 <div class="view">
@@ -157,9 +201,34 @@
     </div>
   </section>
 
-  <p class="muted soon">
-    Progress export / import is coming with the PWA milestone.
-  </p>
+  <section class="card setting">
+    <div class="setting-text">
+      <h3>Backup &amp; transfer</h3>
+      <p class="muted">
+        Save your progress and settings to a file, or import one from another
+        device. Stored on this device only — no account, nothing leaves your
+        browser. Importing replaces everything currently on this device.
+      </p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn-primary" onclick={handleExport}>
+        Export
+      </button>
+      <button type="button" onclick={() => fileInput.click()}>Import…</button>
+      <input
+        bind:this={fileInput}
+        type="file"
+        accept="application/json,.json"
+        class="visually-hidden"
+        onchange={handleImport}
+      />
+    </div>
+    {#if status}
+      <p class="status" class:error={status.kind === 'error'} aria-live="polite">
+        {status.message}
+      </p>
+    {/if}
+  </section>
 </div>
 
 <style>
@@ -261,7 +330,33 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .soon {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* Status line spans the card's full width below the buttons (the card wraps). */
+  .status {
+    flex-basis: 100%;
     margin: 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .status.error {
+    color: var(--bad);
+  }
+
+  /* Off-screen but focusable file input; the visible "Import…" button proxies it. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
 </style>

@@ -8,12 +8,20 @@
 //   {
 //     cards: { [id]: { box, dueAt, seen, correct, timeMs } },  // SR + running aggregates
 //     daily: { day: "YYYY-MM-DD", introduced: <count> },
-//     history: { [day]: { seen, correct } }  // per-day answer log (for streak/accuracy)
+//     history: { [day]: { seen, correct } }, // per-day answer log, last HISTORY_WINDOW_DAYS
+//     lifetime: { seen, correct }            // all-time roll-up of days pruned out of history
 //   }
 
 const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Cap the per-day `history` map at a recent window: a day older than this folds
+// into the `lifetime` roll-up and is dropped, so the map can't grow unbounded
+// (one entry per active day, forever — the M7c state-efficiency NFR). The window
+// also caps the longest streak the Home view can display; 90 days is generous
+// for a personal app. Lifetime accuracy is preserved exactly via the roll-up.
+const HISTORY_WINDOW_DAYS = 90;
 
 // Clamp a single answer's elapsed time before folding it into a card's running
 // `timeMs` total, so a card left on screen (tab backgrounded, walked away) can't
@@ -26,7 +34,9 @@ const MAX_ANSWER_MS = 60_000;
 // older builds can't safely read, and add a migration in `loadState`.
 // v2 (M7a) added per-card answer aggregates (seen/correct/timeMs); they default
 // in lazily on the next answer, so the migration is go-forward with no backfill.
-const STATE_VERSION = 2;
+// v3 (M7c) added the `lifetime` history roll-up; a pre-v3 blob just lacks the key
+// and fills in as days age out of the window — again go-forward, no backfill.
+export const STATE_VERSION = 3;
 
 function now() {
   return Date.now();
@@ -50,6 +60,28 @@ function dayKeyAgo(n) {
 
 function emptyState() {
   return { version: STATE_VERSION, cards: {}, daily: { day: dayKey(), introduced: 0 } };
+}
+
+/**
+ * Bound the per-day `history` map: any day older than HISTORY_WINDOW_DAYS folds
+ * its { seen, correct } into the all-time `lifetime` roll-up and is removed, so
+ * the map stays a fixed-size window while lifetime accuracy is preserved exactly.
+ * Idempotent — re-running it on an already-pruned state is a no-op.
+ */
+function pruneHistory(state) {
+  if (!state.history) return state;
+  const cutoff = dayKeyAgo(HISTORY_WINDOW_DAYS); // string compare: YYYY-MM-DD sorts chronologically
+  const lifetime = state.lifetime ?? { seen: 0, correct: 0 };
+  for (const day in state.history) {
+    if (day < cutoff) {
+      const h = state.history[day];
+      lifetime.seen += h.seen;
+      lifetime.correct += h.correct;
+      delete state.history[day];
+    }
+  }
+  state.lifetime = lifetime;
+  return state;
 }
 
 /** Reset the new-card counter when the calendar day rolls over. */
@@ -77,6 +109,7 @@ export function loadState(storageKey) {
     if (!state.cards || typeof state.cards !== 'object') state.cards = {};
     state.version = STATE_VERSION; // stamp / migrate an unversioned blob forward
     rollDaily(state); // normalize older blobs that predate the daily budget
+    pruneHistory(state); // shrink an over-window history map on first load
     return state;
   } catch {
     return emptyState();
@@ -120,6 +153,7 @@ export function recordAnswer(state, cardId, correct, elapsedMs = 0) {
   h.seen += 1;
   if (correct) h.correct += 1;
   state.history[k] = h;
+  pruneHistory(state); // keep the day map bounded on the one write path
 
   return state;
 }
@@ -203,8 +237,11 @@ export function summary(state, deck, newPerDay) {
 export function stats(state) {
   const hist = state.history ?? {};
 
-  let seen = 0;
-  let correct = 0;
+  // Seed with the lifetime roll-up (days pruned out of `history`) so accuracy is
+  // exact across the window prune, then add the days still in the window.
+  const lifetime = state.lifetime ?? { seen: 0, correct: 0 };
+  let seen = lifetime.seen;
+  let correct = lifetime.correct;
   for (const k in hist) {
     seen += hist[k].seen;
     correct += hist[k].correct;

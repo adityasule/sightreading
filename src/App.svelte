@@ -127,6 +127,14 @@
       {/snippet}
     </svelte:boundary>
   </main>
+
+  <footer>
+    <span>© 2026 Aditya Sule · MIT License</span>
+    <span class="links">
+      <a href="https://github.com/adityasule/sightreading" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://www.linkedin.com/in/aditya-sule/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </span>
+  </footer>
 </div>
 
 <style>
@@ -200,6 +208,32 @@
   main {
     padding: 24px 20px;
     min-height: 0;
+  }
+
+  /* Attribution footer — sits at the bottom on every view. */
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 16px;
+    padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  footer .links {
+    display: inline-flex;
+    gap: 16px;
+  }
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  footer a:hover {
+    color: var(--accent);
+    text-decoration: underline;
   }
 
   /* Error-boundary fallback — centered, calm, with a retry. */
@@ -287,13 +321,17 @@
   @media (min-width: 760px) {
     .layout {
       grid-template-columns: 210px 1fr;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto 1fr auto;
       grid-template-areas:
         'header header'
-        'nav main';
+        'nav main'
+        'footer footer';
     }
     header {
       grid-area: header;
+    }
+    footer {
+      grid-area: footer;
     }
     .hamburger {
       display: none;

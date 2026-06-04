@@ -366,20 +366,26 @@ view to surface the M7a per-card aggregates (nav tab stays "Progress"):
   VexFlow boots lazily on the first drill-down. The dev gallery stays
   `import.meta.env.DEV`-gated for raw render iteration (still useful, never shipped).
 
-**M7c — Export / import state + state-efficiency audit.** The opt-in
-export/import escape hatch GOALS has always reserved for cross-device transfer:
-- **Export**: download all `srt:*` blobs (the five phases + settings + theme) as
-  one versioned JSON file (Blob + anchor; no backend).
-- **Import**: file input → parse → validate against the existing per-blob
-  `version` stamps → write back → reload. Reject newer/corrupt blobs (the
-  M2f load-defence precedent).
-- **Efficiency audit (NFR)**: localStorage autosave already happens on every
-  answer, so "autosave" is covered. The growth vector is the per-day `history`
-  map (one entry per active day, unbounded) — prune/roll it up (e.g. a recent
-  window + an all-time total). Confirm the M7a aggregates stay compact.
+**M7c — Export / import state + state-efficiency audit ✅ shipped.** The opt-in
+export/import escape hatch GOALS reserved for cross-device transfer, plus the
+history-growth audit:
+- **Export / import** (`src/lib/transfer.js`): `buildExport` bundles all `srt:*`
+  keys (five phases + settings + theme) into one versioned JSON file (Blob +
+  anchor; no backend; emits only re-importable plain-object blobs);
+  `parseAndValidate` rejects bad JSON, app/version mismatches and per-blob
+  future-versions **atomically** (the M2f load-defence); `applyImport` *replaces*
+  this device's managed keys (a clean replace, not a stale merge); the Settings
+  view confirms then reloads. 64 transfer unit tests — incl. a full round-trip,
+  idempotency, atomicity, and prototype-pollution.
+- **Efficiency audit (NFR)**: the unbounded per-day `history` map now prunes to a
+  90-day window, folding older days into a `lifetime: { seen, correct }` roll-up
+  so lifetime accuracy stays exact (the streak display caps at the window).
+  `STATE_VERSION` 2→3, go-forward (no backfill). The M7a per-card aggregates were
+  confirmed compact (five numbers/card, bounded by deck size, not answer count).
 
-**M7d — Attribution footer.** A copyright/license footer in the app shell, with a
-**GitHub** link (the repo) and a **LinkedIn** link
+**M7d — Attribution footer ✅ shipped.** A copyright/license footer in the app
+shell (`© 2026 Aditya Sule · MIT License`) with a **GitHub** link
+(`github.com/adityasule/sightreading`) and a **LinkedIn** link
 (`https://www.linkedin.com/in/aditya-sule/`).
 
 **M7e — PWA (manifest + service worker + icons)** *(was M5g; nice-to-have per

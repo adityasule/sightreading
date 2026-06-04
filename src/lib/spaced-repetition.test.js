@@ -348,6 +348,35 @@ describe('stats', () => {
     const s = { history: { [dayKeyAgo(2)]: { seen: 1, correct: 1 } } };
     expect(stats(s).streak).toBe(0);
   });
+
+  it('includes the lifetime roll-up in accuracy', () => {
+    const s = {
+      lifetime: { seen: 10, correct: 5 }, // pruned days: 50%
+      history: { [dayKeyAgo(0)]: { seen: 10, correct: 10 } }, // window: 100%
+    };
+    expect(stats(s).accuracy).toBe(75); // 15/20 combined
+  });
+});
+
+describe('history pruning + lifetime roll-up (M7c)', () => {
+  it('recordAnswer folds over-window days into lifetime and drops them', () => {
+    const s = freshState();
+    const old = dayKeyAgo(120); // older than the 90-day window
+    s.history = { [old]: { seen: 10, correct: 6 } };
+    recordAnswer(s, 'a', true, 0);
+    expect(s.history[old]).toBeUndefined(); // pruned out
+    expect(s.lifetime).toEqual({ seen: 10, correct: 6 }); // folded into the roll-up
+    expect(s.history[dayKey()]).toEqual({ seen: 1, correct: 1 }); // today still logged
+  });
+
+  it('recordAnswer keeps days inside the window', () => {
+    const s = freshState();
+    const recent = dayKeyAgo(30);
+    s.history = { [recent]: { seen: 2, correct: 1 } };
+    recordAnswer(s, 'a', false, 0);
+    expect(s.history[recent]).toEqual({ seen: 2, correct: 1 }); // untouched
+    expect(s.lifetime).toEqual({ seen: 0, correct: 0 }); // nothing pruned
+  });
 });
 
 describe('loadState / saveState (localStorage round-trip)', () => {
@@ -394,7 +423,7 @@ describe('loadState / saveState (localStorage round-trip)', () => {
   it('stamps the schema version on save', () => {
     const s = freshState();
     saveState('srt:test', s);
-    expect(JSON.parse(localStorage.getItem('srt:test')).version).toBe(2);
+    expect(JSON.parse(localStorage.getItem('srt:test')).version).toBe(3);
   });
 
   it('falls back to defaults for a blob from a newer app version', () => {
@@ -419,6 +448,25 @@ describe('loadState / saveState (localStorage round-trip)', () => {
     );
     const loaded = loadState('srt:test');
     expect(loaded.cards.a.box).toBe(2); // progress kept
-    expect(loaded.version).toBe(2); // stamped to current
+    expect(loaded.version).toBe(3); // stamped to current
+  });
+
+  it('prunes an over-window history on load, preserving lifetime accuracy', () => {
+    const old = dayKeyAgo(150);
+    const recent = dayKeyAgo(5);
+    localStorage.setItem(
+      'srt:test',
+      JSON.stringify({
+        version: 3,
+        cards: {},
+        daily: { day: dayKey(), introduced: 0 },
+        history: { [old]: { seen: 8, correct: 4 }, [recent]: { seen: 2, correct: 2 } },
+      })
+    );
+    const loaded = loadState('srt:test');
+    expect(loaded.history[old]).toBeUndefined(); // dropped from the day map
+    expect(loaded.history[recent]).toEqual({ seen: 2, correct: 2 }); // kept
+    expect(loaded.lifetime).toEqual({ seen: 8, correct: 4 }); // folded into the roll-up
+    expect(stats(loaded).accuracy).toBe(60); // 6/10 — unchanged by the prune
   });
 });
