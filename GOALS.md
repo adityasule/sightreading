@@ -332,8 +332,8 @@ docs cleanup. Sequenced **feature/enabler first, productionization last** (the
 M2/M5 precedent): the analytics enabler unblocks the behaviour page, then
 export/import, footer, PWA, and the docs close-out.
 
-**M7a — Per-card stats instrumentation (enabler).** The behaviour page (M7b)
-needs per-card accuracy and time-to-answer, neither of which is captured today:
+**M7a — Per-card stats instrumentation (enabler) ✅ shipped.** The behaviour page
+(M7b) needs per-card accuracy and time-to-answer, neither of which is captured today:
 the SR state per card is only `{ box, dueAt }`, and `history` is a per-day
 aggregate. This slice adds the data:
 - Extend each card's state with **compact running aggregates** — `seen`,

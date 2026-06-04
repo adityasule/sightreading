@@ -47,6 +47,7 @@
   // RELEARN_GAP other cards. Session-only: [{ id, showAfter }] vs `shown`.
   let relearn = [];
   let shown = 0;
+  let shownAt = 0; // performance.now() when the current card was shown (M7a timing)
 
   let isCorrect = $derived(
     mode === 'feedback' && current != null && picked === current.key
@@ -72,6 +73,7 @@
     optionValues = choices(card.key, KEYSIG_POOL); // its key + distractors
     mode = 'answering';
     shown += 1;
+    shownAt = performance.now();
     renderKeySig();
   }
 
@@ -165,7 +167,7 @@
       // the scheduler or first-attempt session stats — just keep it cycling.
       if (!correct) enqueueRelearn(current.id);
     } else {
-      srs.recordAnswer(srsState, current.id, correct);
+      srs.recordAnswer(srsState, current.id, correct, performance.now() - shownAt);
       srs.saveState(STORAGE_KEY, srsState);
 
       session.seen += 1;

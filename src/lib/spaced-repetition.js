@@ -6,7 +6,7 @@
 //
 // State shape:
 //   {
-//     cards: { [id]: { box, dueAt } },
+//     cards: { [id]: { box, dueAt, seen, correct, timeMs } },  // SR + running aggregates
 //     daily: { day: "YYYY-MM-DD", introduced: <count> },
 //     history: { [day]: { seen, correct } }  // per-day answer log (for streak/accuracy)
 //   }
@@ -15,11 +15,18 @@ const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Clamp a single answer's elapsed time before folding it into a card's running
+// `timeMs` total, so a card left on screen (tab backgrounded, walked away) can't
+// permanently skew the cumulative average. 60s is well beyond any genuine read.
+const MAX_ANSWER_MS = 60_000;
+
 // Persisted-blob schema version. Stamped on every save; checked on load so a
 // blob written by a *newer* app (version > this) falls back to defaults rather
 // than being half-read and corrupted. Bump this when the shape changes in a way
 // older builds can't safely read, and add a migration in `loadState`.
-const STATE_VERSION = 1;
+// v2 (M7a) added per-card answer aggregates (seen/correct/timeMs); they default
+// in lazily on the next answer, so the migration is go-forward with no backfill.
+const STATE_VERSION = 2;
 
 function now() {
   return Date.now();
@@ -89,12 +96,20 @@ export function introduce(state, cardId) {
   return state;
 }
 
-export function recordAnswer(state, cardId, correct) {
+export function recordAnswer(state, cardId, correct, elapsedMs = 0) {
   const card = state.cards[cardId] ?? { box: 0, dueAt: now() };
   card.box = correct
     ? Math.min(card.box + 1, BOX_INTERVALS_DAYS.length - 1)
     : 0;
   card.dueAt = now() + BOX_INTERVALS_DAYS[card.box] * DAY_MS;
+
+  // Running per-card aggregates (M7a) — totals, not an event log, so the
+  // behaviour page derives accuracy = correct/seen and avg time = timeMs/seen
+  // without storing every answer. `?? 0` lets pre-M7a cards self-heal here.
+  card.seen = (card.seen ?? 0) + 1;
+  if (correct) card.correct = (card.correct ?? 0) + 1;
+  card.timeMs = (card.timeMs ?? 0) + Math.round(Math.min(Math.max(0, elapsedMs), MAX_ANSWER_MS));
+
   state.cards[cardId] = card;
 
   // Log the answer against today so Home can show a streak + accuracy. Mirrors
@@ -204,4 +219,44 @@ export function stats(state) {
   }
 
   return { streak, accuracy };
+}
+
+/**
+ * Per-card answer aggregates for the behaviour page (M7b), derived from the
+ * running totals `recordAnswer` keeps:
+ *   - accuracy: first-attempt accuracy (%), or null if the card is unseen.
+ *   - avgMs:    average time-to-answer in ms, or null if unseen.
+ */
+export function cardStats(state, cardId) {
+  const c = state.cards?.[cardId];
+  const seen = c?.seen ?? 0;
+  if (!seen) return { seen: 0, correct: 0, accuracy: null, avgMs: null };
+  const correct = c.correct ?? 0;
+  return {
+    seen,
+    correct,
+    accuracy: Math.round((correct / seen) * 100),
+    avgMs: Math.round((c.timeMs ?? 0) / seen),
+  };
+}
+
+/**
+ * Phase-wide answer aggregates (M7b's general metrics), summing every card's
+ * running totals: average accuracy (%) and average time-to-answer (ms), each
+ * null until at least one answer is recorded.
+ */
+export function aggregateStats(state) {
+  let seen = 0;
+  let correct = 0;
+  let timeMs = 0;
+  for (const id in state.cards ?? {}) {
+    const c = state.cards[id];
+    seen += c.seen ?? 0;
+    correct += c.correct ?? 0;
+    timeMs += c.timeMs ?? 0;
+  }
+  return {
+    accuracy: seen ? Math.round((correct / seen) * 100) : null,
+    avgMs: seen ? Math.round(timeMs / seen) : null,
+  };
 }

@@ -10,6 +10,8 @@ import {
   boxAtLeast,
   summary,
   stats,
+  cardStats,
+  aggregateStats,
 } from './spaced-repetition.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -91,6 +93,81 @@ describe('recordAnswer', () => {
     recordAnswer(s, 'a', false);
     const h = s.history[dayKey()];
     expect(h).toEqual({ seen: 2, correct: 1 });
+  });
+});
+
+describe('recordAnswer — per-card aggregates (M7a)', () => {
+  it('accumulates seen, correct and timeMs across answers', () => {
+    const s = freshState();
+    recordAnswer(s, 'a', true, 1000);
+    recordAnswer(s, 'a', false, 2000);
+    recordAnswer(s, 'a', true, 500);
+    expect(s.cards.a.seen).toBe(3);
+    expect(s.cards.a.correct).toBe(2);
+    expect(s.cards.a.timeMs).toBe(3500);
+  });
+
+  it('defaults elapsedMs to 0 (the old 3-arg signature leaves timeMs at 0)', () => {
+    const s = freshState();
+    recordAnswer(s, 'a', true);
+    expect(s.cards.a.seen).toBe(1);
+    expect(s.cards.a.timeMs).toBe(0);
+  });
+
+  it('clamps a single answer time to 60s and floors a negative at 0', () => {
+    const s = freshState();
+    recordAnswer(s, 'a', true, 5 * 60 * 1000); // 5 min idle → capped at 60s
+    recordAnswer(s, 'a', true, -100); // bogus negative → 0
+    expect(s.cards.a.timeMs).toBe(60_000);
+  });
+
+  it('initialises aggregates lazily for a pre-M7a card with no fields', () => {
+    const s = { cards: { a: { box: 2, dueAt: 0 } } };
+    recordAnswer(s, 'a', true, 1000);
+    expect(s.cards.a).toMatchObject({ seen: 1, correct: 1, timeMs: 1000 });
+    expect(s.cards.a.box).toBe(3); // box logic still runs
+  });
+});
+
+describe('cardStats', () => {
+  it('returns null accuracy/avgMs for an unseen card', () => {
+    expect(cardStats({ cards: {} }, 'a')).toEqual({
+      seen: 0, correct: 0, accuracy: null, avgMs: null,
+    });
+  });
+
+  it('derives accuracy and average time from the running totals', () => {
+    const s = { cards: { a: { box: 1, dueAt: 0, seen: 4, correct: 3, timeMs: 8000 } } };
+    expect(cardStats(s, 'a')).toEqual({
+      seen: 4, correct: 3, accuracy: 75, avgMs: 2000,
+    });
+  });
+});
+
+describe('aggregateStats', () => {
+  it('returns nulls when nothing has been answered', () => {
+    expect(aggregateStats({ cards: {} })).toEqual({ accuracy: null, avgMs: null });
+  });
+
+  it('sums every card into a phase-wide accuracy and average time', () => {
+    const s = {
+      cards: {
+        a: { seen: 2, correct: 2, timeMs: 2000 },
+        b: { seen: 2, correct: 1, timeMs: 6000 },
+      },
+    };
+    // 3/4 correct = 75%; 8000ms / 4 answers = 2000ms
+    expect(aggregateStats(s)).toEqual({ accuracy: 75, avgMs: 2000 });
+  });
+
+  it('ignores cards with no aggregates (pre-M7a, not yet re-answered)', () => {
+    const s = {
+      cards: {
+        a: { box: 2, dueAt: 0 },
+        b: { seen: 1, correct: 1, timeMs: 1000 },
+      },
+    };
+    expect(aggregateStats(s)).toEqual({ accuracy: 100, avgMs: 1000 });
   });
 });
 
@@ -267,7 +344,7 @@ describe('loadState / saveState (localStorage round-trip)', () => {
   it('stamps the schema version on save', () => {
     const s = freshState();
     saveState('srt:test', s);
-    expect(JSON.parse(localStorage.getItem('srt:test')).version).toBe(1);
+    expect(JSON.parse(localStorage.getItem('srt:test')).version).toBe(2);
   });
 
   it('falls back to defaults for a blob from a newer app version', () => {
@@ -292,6 +369,6 @@ describe('loadState / saveState (localStorage round-trip)', () => {
     );
     const loaded = loadState('srt:test');
     expect(loaded.cards.a.box).toBe(2); // progress kept
-    expect(loaded.version).toBe(1); // stamped to current
+    expect(loaded.version).toBe(2); // stamped to current
   });
 });

@@ -56,6 +56,7 @@
   // of how many cards have been displayed this session.
   let relearn = [];
   let shown = 0;
+  let shownAt = 0; // performance.now() when the current card was shown (M7a timing)
 
   // Letters mode grades the spelling (letter + accidental); Piano mode grades
   // the key (pitch class), so C♯ and D♭ both accept the same black key.
@@ -83,6 +84,7 @@
     source = src;
     mode = 'answering';
     shown += 1;
+    shownAt = performance.now();
     renderNote();
   }
 
@@ -216,7 +218,7 @@
       // card cycling until it's answered correctly.
       if (!correct) enqueueRelearn(current.id);
     } else {
-      srs.recordAnswer(srsState, current.id, correct);
+      srs.recordAnswer(srsState, current.id, correct, performance.now() - shownAt);
       srs.saveState(STORAGE_KEY, srsState);
 
       session.seen += 1;
