@@ -326,17 +326,80 @@ engine module + a view + a render fn + wiring, the Chords (M5a–d) precedent. S
 **M6b — Interval training** ✅ shipped — see HISTORY.md.
 
 ### Milestone 7 — Refinement
-- **M7a — PWA (manifest + service worker)** *(was M5g; nice-to-have per NFRs, not
-  blocking).* Web app manifest + a service worker that precaches the app shell and
-  the lazy VexFlow chunk for offline use. Its prerequisite (no runtime CDN font
-  fetch) is satisfied by M5e, so offline is genuinely offline by the time this
-  lands. Keep the worker conservative about staleness (versioned precache or
-  network-first for the HTML) so a deploy is never pinned by a stale cached worker.
+A polish/refinement pass: a richer behaviour (Progress) view backed by new
+per-card analytics, state export/import, an attribution footer, the PWA, and a
+docs cleanup. Sequenced **feature/enabler first, productionization last** (the
+M2/M5 precedent): the analytics enabler unblocks the behaviour page, then
+export/import, footer, PWA, and the docs close-out.
+
+**M7a — Per-card stats instrumentation (enabler).** The behaviour page (M7b)
+needs per-card accuracy and time-to-answer, neither of which is captured today:
+the SR state per card is only `{ box, dueAt }`, and `history` is a per-day
+aggregate. This slice adds the data:
+- Extend each card's state with **compact running aggregates** — `seen`,
+  `correct`, and total answer `timeMs` (average = total ÷ count, so no per-answer
+  event log; keep it small per the in-memory-efficiency NFR).
+- Capture elapsed time (card shown → answer) in all five quiz views and thread it
+  through the one choke point, `recordAnswer(state, id, correct, elapsedMs)` —
+  the scheduler stays card-agnostic; views just time their own `showCard`→`answer`.
+- Per-phase aggregate helpers (average accuracy, average time) for M7b's general
+  metrics, derived from the per-card aggregates.
+- Bump `STATE_VERSION` with a forward migration (existing cards default the new
+  fields to 0/absent — go-forward only, no backfill). Unit tests.
+
+**M7b — Behaviour page (Progress redesign + Cards merge).** Rework the Progress
+view into the behaviour page:
+- **Overview** keeps the existing per-phase progress bars and adds two general
+  metrics — **average accuracy** and **average time to answer** (from M7a).
+- **Drill-down**: clicking a category opens a detail view of **every possible
+  card** in it; each card shows whether it's been **introduced to the deck**,
+  plus its **average accuracy** and **average time to answer**, rendered as a
+  **glyph + stats grid** — each card's actual staff glyph drawn via the shared
+  `render.js`. This folds the dev card gallery's "browse every card" into the
+  production view. The dev **Cards (dev)** gallery stays `import.meta.env.DEV`-
+  gated for raw render iteration (still useful, never shipped).
+
+**M7c — Export / import state + state-efficiency audit.** The opt-in
+export/import escape hatch GOALS has always reserved for cross-device transfer:
+- **Export**: download all `srt:*` blobs (the five phases + settings + theme) as
+  one versioned JSON file (Blob + anchor; no backend).
+- **Import**: file input → parse → validate against the existing per-blob
+  `version` stamps → write back → reload. Reject newer/corrupt blobs (the
+  M2f load-defence precedent).
+- **Efficiency audit (NFR)**: localStorage autosave already happens on every
+  answer, so "autosave" is covered. The growth vector is the per-day `history`
+  map (one entry per active day, unbounded) — prune/roll it up (e.g. a recent
+  window + an all-time total). Confirm the M7a aggregates stay compact.
+
+**M7d — Attribution footer.** A copyright/license footer in the app shell, with a
+**GitHub** link (the repo) and a **LinkedIn** link
+(`https://www.linkedin.com/in/aditya-sule/`).
+
+**M7e — PWA (manifest + service worker + icons)** *(was M5g; nice-to-have per
+NFRs, not blocking).* Offline-capable install:
+- **`vite-plugin-pwa` (Workbox)** generates a **versioned** service worker +
+  precache manifest from the build (handles hashed asset names), precaching the
+  app shell and the lazy `vexflow-bravura` chunk. A dev-only build dependency —
+  no runtime third-party call, so the no-backend constraint holds. Its
+  prerequisite (no runtime CDN font fetch) is satisfied by M5e, so offline is
+  genuinely offline.
+- Add **app icons** (none exist today) — at least 192/512 + maskable — and the
+  web app manifest (name, theme/background colors matching the existing
+  `theme-color`, display `standalone`).
+- Keep the worker conservative about staleness (**network-first for the HTML** /
+  versioned precache) so a deploy is never pinned by a stale cached worker; add
+  the SW path to `public/_headers` with `no-cache` (the header file already notes
+  this).
+
+**M7f — Docs cleanup & simplification.** The close-out: collapse the already-
+shipped Phase 2/3/Intervals in-scope detail in this file to one-liners pointing
+at HISTORY (the detail now lives there), simplify the README/CLAUDE overlaps, and
+correct stale notes. Per the workflow, move M7's own detail here → HISTORY once it
+ships.
 
 ### Future ideas (not committed)
 - Audio playback of the rendered note (Web Audio API — free, client-side)
 - Optional MIDI input (Web MIDI API)
-- Progress export/import as JSON
 - Relative-minor identification in Phase 3
 - Diatonic triads within a key (Phase 2 extension — the I/ii/iii/IV/V/vi triads
   per key, teaching chords-in-context rather than isolated triad recognition)
