@@ -108,17 +108,35 @@ Full scope and design in [HISTORY.md](./HISTORY.md).
 - Chords spanning both clefs
 - Diatonic triads within a key (see Future ideas)
 
-### Phase 3 — Key signature recognition (M6)
+### Phase 3 — Key signature recognition ✅ shipped
 **In scope**
 - Render a key signature (sharps or flats) on a clef
 - User identifies the major key
-- Full 15-key coverage (7♯ to 7♭ plus C)
+- Full 15-key coverage (7♯ to 7♭ plus C), introduced in circle-of-fifths order
 - Spaced repetition per key signature card
 
 **Out of scope (Phase 3)**
 - Relative minor identification
 - Modes
 - Atonal / non-Western signatures
+
+### Interval training ✅ shipped (route id `phase4`, user-facing **Intervals**)
+**In scope**
+- Render two notes a fixed interval apart on a clef, drawn left→right so the pair
+  reads ascending or descending; the user names the interval by multiple choice
+- Coverage: the 12 simple intervals within an octave — minor/major 2nd·3rd·6th·7th,
+  perfect 4th/5th/octave, and the tritone — introduced by difficulty/consonance
+  (perfects → thirds/sixths → seconds/sevenths → tritone last)
+- Render on the enabled clefs (reuses the treble/bass setting); a card per
+  `(clef, interval)`, the note pair (register + direction) chosen at render time
+- Spaced repetition per interval card; difficulty-gated progression (reuses the
+  generic scheduler + the curriculum-pluggable `progression.js`)
+
+**Out of scope (Intervals)**
+- Compound intervals (beyond an octave) and the unison
+- Quality of the tritone beyond a single "tritone" answer (aug 4th / dim 5th)
+- Naming the two notes, or grading the direction (direction is shown, not quizzed)
+- Audio / ear-training (a Future idea — this is purely visual reading)
 
 ### Out of scope for v1 entirely
 - User accounts, cloud sync, leaderboards
@@ -144,7 +162,8 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 
 ### UI
 - Single-page app, view-switching driven by simple state (no router lib in v1).
-- Views: Home/Today, Basics, Notation, Chords, Key Signatures, Progress, Settings.
+- Views: Home/Today, Basics, Notation, Chords, Key Signatures, Intervals,
+  Progress, Settings.
 - **User-facing names vs. internal ids.** "Phase 0/1/2/3" is developer shorthand
   and must never appear in the UI. The user sees musical names; the code keeps
   the short route ids (single source of truth in `src/lib/phases.js`):
@@ -152,6 +171,9 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
   - Phase 1 → **Notation** (route id `phase1`, storage key `srt:phase1`)
   - Phase 2 → **Chords** (route id `phase2`)
   - Phase 3 → **Key Signatures** (route id `phase3`)
+  - **Intervals** (route id `phase4`, storage key `srt:phase4`) — a 5th quiz; the
+    "Phase N" numbering stopped at 3, so this carries only its route id, not a
+    "Phase 4" label
 - Navigation: side nav on wide screens (≥760px); a hamburger-driven off-canvas
   drawer on narrow screens (the bottom tab bar tested poorly on mobile).
 - Letter input via on-screen A–G buttons (touch-friendly, min 44px targets);
@@ -160,7 +182,8 @@ and scale-progression curriculum) is recorded in [HISTORY.md](./HISTORY.md).
 
 ### Music rendering
 - VexFlow renders to SVG. Minimal — no time signatures, no measure bars.
-- Single staff: one note (Phase 1) or 3 stacked notes (Phase 2).
+- Single staff: one note (Phase 1), 3 stacked notes (Phase 2), a clef-borne key
+  signature (Phase 3), or two side-by-side notes (Intervals).
 - Phase 0 also renders, in isolation: a single clef-less note of a given
   duration (note time-value cards), a rest glyph (rest time-value cards), a
   lone clef (clef-symbol cards), and a lone accidental glyph (accidental cards,
@@ -210,10 +233,11 @@ Phase 1 concept only.)
 ### Progress view
 A dedicated nav view (route id `progress`) showing progress across every phase,
 read from each phase's `srt:phaseN` blob (no new persistence). A completion bar
-per phase. The **Notation** phase shows **two** bars — scale-level progression
-and individual-note mastery — since it carries both dimensions. Phases not yet
-built (Chords, Key Signatures) show as locked/empty; Chords gains its own bar
-split when it ships in M5.
+per phase, except the curriculum phases (Notation, Chords, Key Signatures,
+Intervals) show **two** bars — level progression + individual-card mastery —
+since each carries both dimensions. Basics shows one (a flat deck). All phases
+are now built; an unbuilt phase would render a locked/empty bar (driven by the
+`PHASES` `ready` flag).
 
 ### Cost & rate-limit safeguards
 - No backend in v1 — primary defense. No third-party APIs called at runtime.
@@ -226,11 +250,12 @@ split when it ships in M5.
 
 ## Productionization Plan
 
-> ✅ **Milestones 0 – 5 complete** — Phase 1 (Notation), Phase 0 (Basics) and
-> Phase 2 (Chords) shipped, plus the progress view, productionization hardening,
-> the OSS publish prep, the first production deploy (Cloudflare Workers, live at
-> `sightreading.adityasule.com`), the music-font self-hosting, the contrast a11y
-> fix, and the committed CDP dev helper. See [HISTORY.md](./HISTORY.md).
+> ✅ **Milestones 0 – 6 complete** — Phase 1 (Notation), Phase 0 (Basics),
+> Phase 2 (Chords), Phase 3 (Key Signatures) and Interval training shipped, plus
+> the progress view, productionization hardening, the OSS publish prep, the first
+> production deploy (Cloudflare Workers, live at `sightreading.adityasule.com`),
+> the music-font self-hosting, the contrast a11y fix, and the committed CDP dev
+> helper. See [HISTORY.md](./HISTORY.md).
 
 ### Milestone 2 — Basics phase, progress view, polish & productionization ✅ complete
 Adds the new user-facing features (Phase 0, progress view, middle-C anchor) and
@@ -289,7 +314,16 @@ productionization last (the M2 precedent). See [HISTORY.md](./HISTORY.md).
 
 *(M5g — PWA — moved to Milestone 7; its M5e prerequisite is now satisfied.)*
 
-### Milestone 6 — Phase 3 (key signatures)
+### Milestone 6 — Phase 3 (key signatures) + interval training ✅ complete
+Phase 3 (Key Signatures) and a new Intervals quiz shipped, both built on the
+Phase 0–2 shell (the card-agnostic Leitner scheduler + the pluggable
+`progression.js`, the `Choices` pad, the shared `render.js`) — each is just an
+engine module + a view + a render fn + wiring, the Chords (M5a–d) precedent. See
+[HISTORY.md](./HISTORY.md).
+
+**M6a — Key signatures quiz (Phase 3)** ✅ shipped — see HISTORY.md.
+
+**M6b — Interval training** ✅ shipped — see HISTORY.md.
 
 ### Milestone 7 — Refinement
 - **M7a — PWA (manifest + service worker)** *(was M5g; nice-to-have per NFRs, not

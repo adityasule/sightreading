@@ -3,17 +3,18 @@
   import { settings } from '../lib/settings.svelte.js';
   import { choices } from '../lib/music.js';
   import {
-    buildKeySigDeck,
-    keySigLevelsFor,
-    KEYSIG_POOL,
-    keySigOptionLabel,
-  } from '../lib/keysig.js';
-  import { drawKeySignature } from '../lib/render.js';
+    buildIntervalDeck,
+    intervalLevelsFor,
+    pickIntervalNotes,
+    INTERVAL_POOL,
+    intervalOptionLabel,
+  } from '../lib/intervals.js';
+  import { drawInterval } from '../lib/render.js';
   import Choices from '../lib/Choices.svelte';
   import * as srs from '../lib/spaced-repetition.js';
   import { progress, advance } from '../lib/progression.js';
 
-  const STORAGE_KEY = 'srt:phase3';
+  const STORAGE_KEY = 'srt:phase4';
   const ADVANCE_MS = 750; // auto-advance delay after a correct answer
   const RELEARN_GAP = 3; // re-show a missed card after this many other cards
 
@@ -23,17 +24,21 @@
   // SRS state is a plain blob (persisted to localStorage), not reactive.
   let srsState = srs.loadState(STORAGE_KEY);
 
-  let deck = $derived(buildKeySigDeck(settings)); // reshapes when clefs toggle
+  let deck = $derived(buildIntervalDeck(settings)); // reshapes when clefs toggle
 
   let current = $state(null); // active card, or null when caught up
+  // The note pair chosen for *this* presentation (register + direction, randomised),
+  // frozen on the card so the feedback re-render redraws the same pair rather than
+  // re-rolling. Set in showCard, read by renderInterval.
+  let notes = $state(null);
   let mode = $state('answering'); // 'answering' | 'feedback' | 'caughtup'
   let source = $state('scheduled'); // 'scheduled' | 'relearn' | 'practice'
-  let picked = $state(null); // chosen key this round (e.g. 'G')
-  let optionValues = $state([]); // the 4 key answers this card (frozen order)
+  let picked = $state(null); // chosen interval this round (e.g. 'M3')
+  let optionValues = $state([]); // the 4 interval answers this card (frozen order)
   let session = $state({ seen: 0, correct: 0 });
   let counts = $state({ due: 0, learned: 0, total: 0, newRemaining: 0 });
   // Progression view (current level, per-level progress, gate). See progression.js;
-  // Phase 3 drives it with the key-signature curriculum bucketer.
+  // Phase 4 drives it with the interval curriculum bucketer.
   let level = $state(null);
 
   // Manual deck top-up (batched, as in Phase 0/1/2): each "add more" click grants
@@ -51,17 +56,17 @@
   let isCorrect = $derived(
     mode === 'feedback' && current != null && picked === current.key
   );
-  // Option {value,label} pairs — the major-key names, in the round's frozen order.
+  // Option {value,label} pairs — the interval names, in the round's frozen order.
   let options = $derived(
-    optionValues.map((v) => ({ value: v, label: keySigOptionLabel(v) }))
+    optionValues.map((v) => ({ value: v, label: intervalOptionLabel(v) }))
   );
 
-  // Key-sig levels are one key each; the level name is the circle-of-fifths label.
+  // Interval levels carry no key-signature tag; the level name is the group label.
   const levelName = (lvl) => lvl.label;
 
   function refreshCounts() {
     counts = srs.summary(srsState, deck, settings.newCardsPerDay);
-    level = progress(srsState, deck, keySigLevelsFor);
+    level = progress(srsState, deck, intervalLevelsFor);
   }
 
   // Show a card and tag where it came from (drives how its answer is scored).
@@ -69,10 +74,11 @@
     current = card;
     source = src;
     picked = null;
-    optionValues = choices(card.key, KEYSIG_POOL); // its key + distractors
+    notes = pickIntervalNotes(card); // random register + direction for this showing
+    optionValues = choices(card.key, INTERVAL_POOL); // its key + distractors
     mode = 'answering';
     shown += 1;
-    renderKeySig();
+    renderInterval();
   }
 
   // Pull a relearning card off the queue by id, tolerating ones that have since
@@ -101,9 +107,9 @@
     }
 
     // 2. The normal scheduler: a due card, or a fresh one from the current level
-    //    only (progression gates which keys are introducible). Each opted-in
+    //    only (progression gates which intervals are introducible). Each opted-in
     //    top-up batch lifts the daily budget by one `newCardsPerDay`.
-    const view = progress(srsState, deck, keySigLevelsFor);
+    const view = progress(srsState, deck, intervalLevelsFor);
     const budget = settings.newCardsPerDay * (1 + extraBatches);
     const id = srs.pickNext(srsState, deck, budget, view.pool);
     srs.saveState(STORAGE_KEY, srsState); // persist newly-introduced card / migration
@@ -129,9 +135,9 @@
     showCard(introduced[Math.floor(Math.random() * introduced.length)], 'practice');
   }
 
-  // Accept the progression gate: unlock the next level, then serve its keys.
+  // Accept the progression gate: unlock the next level, then serve its intervals.
   function startNextLevel() {
-    advance(srsState, deck, keySigLevelsFor);
+    advance(srsState, deck, intervalLevelsFor);
     srs.saveState(STORAGE_KEY, srsState);
     next();
   }
@@ -177,6 +183,7 @@
     }
 
     mode = 'feedback';
+    renderInterval(); // recolour the note pair green/red
     if (correct) advanceTimer = setTimeout(next, ADVANCE_MS);
   }
 
@@ -204,11 +211,16 @@
     }
   }
 
-  function renderKeySig() {
-    if (!vex || !staffEl || !current) return;
-    // No feedback tint: the signature's accidentals draw as <text> glyphs VexFlow
-    // can't recolour (the drawClef limitation). Correct/wrong shows on the pad.
-    drawKeySignature(vex, staffEl, { clef: current.clef, spec: current.spec });
+  function renderInterval() {
+    if (!vex || !staffEl || !current || !notes) return;
+    const color =
+      mode === 'feedback' && picked != null ? (isCorrect ? '#16a34a' : '#dc2626') : null;
+    drawInterval(vex, staffEl, {
+      clef: current.clef,
+      keys: notes.keys,
+      accidentals: notes.accidentals,
+      color,
+    });
   }
 
   onMount(async () => {
@@ -220,7 +232,10 @@
     vex = {
       Renderer: m.Renderer,
       Stave: m.Stave,
-      KeySignature: m.KeySignature,
+      StaveNote: m.StaveNote,
+      Accidental: m.Accidental,
+      Formatter: m.Formatter,
+      Voice: m.Voice,
     };
     // Gate the first render on the music font being ready, or glyph metrics are
     // wrong on first paint (see M1c in HISTORY). The bravura build registers both
@@ -249,14 +264,13 @@
 
 <div class="view">
   <header class="head">
-    <h2>Key Signatures</h2>
-    <p class="muted">Name the major key from its signature.</p>
+    <h2>Intervals</h2>
+    <p class="muted">Name the interval between the two notes.</p>
   </header>
 
   {#if level?.current}
     <div class="level" aria-live="polite">
       <span class="level-name">{level.current.label}</span>
-      <span class="level-tag">{level.current.keySig}</span>
       <span class="level-prog"><strong>{level.mastered}</strong>/{level.total} mastered</span>
     </div>
   {/if}
@@ -284,23 +298,23 @@
         <p class="good">
           ✅ You've mastered <strong>{levelName(level.current)}</strong>.
         </p>
-        <p class="muted">Ready for the next key?</p>
+        <p class="muted">Ready for the next group?</p>
         <button type="button" class="btn-primary" onclick={startNextLevel}>
           Start {levelName(level.next)}
         </button>
         <button type="button" onclick={practice}>Keep practicing</button>
       {:else if poolHasNew}
-        <p>🎉 You're caught up — that's today's new-key limit.</p>
+        <p>🎉 You're caught up — that's today's new-interval limit.</p>
         <p class="muted">Want to keep learning?</p>
         <button type="button" class="btn-primary" onclick={addMoreCards}>
-          Add more new keys
+          Add more new intervals
         </button>
         <button type="button" onclick={practice}>Keep practicing</button>
       {:else if level?.next}
         <p class="good">
-          ✅ You've started every clef for <strong>{levelName(level.current)}</strong>.
+          ✅ You've started every interval in <strong>{levelName(level.current)}</strong>.
         </p>
-        <p class="muted">Master it with reviews, or jump ahead now.</p>
+        <p class="muted">Master them with reviews, or jump ahead now.</p>
         <button type="button" class="btn-primary" onclick={startNextLevel}>
           Start {levelName(level.next)}
         </button>
@@ -320,14 +334,14 @@
         {:else}
           <p class="bad">
             That was <strong>{current.name}</strong>
-            {#if picked}(you picked {keySigOptionLabel(picked)}){/if}.
+            {#if picked}(you picked {intervalOptionLabel(picked)}){/if}.
           </p>
           <button type="button" class="btn-primary" onclick={next}>Next</button>
         {/if}
       {:else if source === 'relearn'}
         <p class="prompt-hint relearn">↻ One you just missed — try again.</p>
       {:else}
-        <p class="prompt-hint muted">Which major key is this?</p>
+        <p class="prompt-hint muted">Which interval is this?</p>
       {/if}
     </div>
 
@@ -375,7 +389,7 @@
     color: var(--accent);
   }
 
-  /* Current level banner — the circle-of-fifths key the user is working through. */
+  /* Current level banner — the difficulty group the user is working through. */
   .level {
     display: flex;
     flex-wrap: wrap;
@@ -386,13 +400,6 @@
   }
   .level-name {
     font-weight: 600;
-  }
-  .level-tag {
-    font-size: 0.8rem;
-    color: var(--accent);
-    background: var(--accent-weak);
-    padding: 2px 8px;
-    border-radius: 999px;
   }
   .level-prog {
     font-size: 0.85rem;

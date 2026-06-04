@@ -17,18 +17,20 @@ npm run render   # (dev-only) render staff glyphs to ./render-out/*.svg
 ```
 
 `npm run render` is a dev tool for fast iteration on the music rendering: it
-draws the project's staff glyphs (Basics note/rest/clef cards and Phase 1 notes)
-to self-contained SVGs through the same `src/lib/render.js` the app uses, so the
-output can't drift from what ships. `-- note|rest|clef|phase1` narrows by kind;
-a second arg filters by key/value/id; `-- --feedback` tints. The browser is
+draws the project's staff glyphs (Basics note/rest/clef/accidental cards, Phase 1
+notes, chords, key signatures, and interval pairs) to self-contained SVGs through
+the same `src/lib/render.js` the app uses, so the output can't drift from what
+ships. `-- note|rest|clef|accidental|phase1|chord|keysig|interval` narrows by
+kind; a second arg filters by key/value/id; `-- --feedback` tints. The browser is
 still the source of truth — this just shortens the loop.
 
 ## Tests
 
 [Vitest](https://vitest.dev) unit-tests the pure-logic modules (`music.js`,
-`spaced-repetition.js`, `progression.js`) — range math, deck building, the
-Leitner scheduler, and curriculum/level bucketing. Tests live next to the code
-as `src/lib/*.test.js`.
+`spaced-repetition.js`, `progression.js`, `chords.js`, `keysig.js`,
+`intervals.js`) — range math, deck building, the Leitner scheduler, interval
+spelling, and curriculum/level bucketing. Tests live next to the code as
+`src/lib/*.test.js`.
 
 ```bash
 npm test            # run once (CI-style)
@@ -111,8 +113,8 @@ this app's expected usage by orders of magnitude.
 ## Project structure
 
 View files keep the dev shorthand `PhaseN`; users see musical names (Phase 0 →
-Basics, Phase 1 → Notation, Phase 2 → Chords, Phase 3 → Key Signatures — the
-mapping lives in `src/lib/phases.js`).
+Basics, Phase 1 → Notation, Phase 2 → Chords, Phase 3 → Key Signatures, Phase 4 →
+Intervals — the mapping lives in `src/lib/phases.js`).
 
 ```
 GOALS.md                  forward-looking plan + scope
@@ -128,16 +130,20 @@ src/
   App.svelte              shell: nav, view switching, error boundary
   views/                  one component per nav section
     Home.svelte           today's due/new/learned snapshot + quick actions
-    Phase0.svelte         Basics — multiple-choice duration/rest/clef quiz
+    Phase0.svelte         Basics — multiple-choice duration/rest/clef/accidental quiz
     Phase1.svelte         Notation — single-note quiz (VexFlow + answer input + SRS)
-    Phase2.svelte         Chords (placeholder)
-    Phase3.svelte         Key Signatures (placeholder)
+    Phase2.svelte         Chords — major/minor triad recognition quiz
+    Phase3.svelte         Key Signatures — name-the-major-key quiz
+    Phase4.svelte         Intervals — name-the-interval quiz
     Progress.svelte       cross-phase completion bars
     Settings.svelte       theme, answer mode, clefs, new-cards-per-day, naming
   lib/
     music.js              MIDI↔note helpers, buildDeck/buildBasicsDeck, curriculum
+    chords.js             Chords engine — deck + circle-of-fifths curriculum
+    keysig.js             Key Signatures engine — deck + circle-of-fifths curriculum
+    intervals.js          Intervals engine — deck + difficulty curriculum
     spaced-repetition.js  generic, card-agnostic Leitner scheduler
-    progression.js        scale-based curriculum layer on top of the scheduler
+    progression.js        curriculum layer on top of the scheduler (pluggable levelsFn)
     render.js             shared VexFlow staff renderer (app + render script)
     phases.js             phase id ↔ display-name single source of truth
     settings.svelte.js    reactive, persisted quiz settings

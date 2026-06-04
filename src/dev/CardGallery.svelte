@@ -8,12 +8,25 @@
   import { settings } from '../lib/settings.svelte.js';
   import { buildBasicsDeck, basicsLabel, buildDeck } from '../lib/music.js';
   import { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } from '../lib/chords.js';
-  import { drawDurationNote, drawRest, drawClef, drawAccidental, drawNote, drawChord } from '../lib/render.js';
+  import { buildKeySigDeck } from '../lib/keysig.js';
+  import { buildIntervalDeck, intervalPlacements } from '../lib/intervals.js';
+  import {
+    drawDurationNote,
+    drawRest,
+    drawClef,
+    drawAccidental,
+    drawNote,
+    drawChord,
+    drawKeySignature,
+    drawInterval,
+  } from '../lib/render.js';
 
   const TABS = [
     { id: 'phase0', label: 'Basics' },
     { id: 'phase1', label: 'Notation' },
     { id: 'phase2', label: 'Chords' },
+    { id: 'phase3', label: 'Key Signatures' },
+    { id: 'phase4', label: 'Intervals' },
   ];
   let active = $state('phase0');
 
@@ -70,6 +83,50 @@
           })),
         },
       ];
+    }
+    if (active === 'phase3') {
+      return [
+        {
+          heading: null,
+          chord: false,
+          cells: buildKeySigDeck(settings).map((c) => ({
+            label: `${c.name} · ${c.clef}`,
+            draw: (el) => drawKeySignature(vex, el, { clef: c.clef, spec: c.spec }),
+          })),
+        },
+      ];
+    }
+    if (active === 'phase4') {
+      // One group per (clef, interval), like Chords' inversions: a representative
+      // 2×2 of the quiz's variety — ascending + descending, each at a low and a
+      // high register (by the pair's floor pitch), so both directions and the
+      // ledger-line extremes show. The quiz randomises across every placement
+      // (~528 in all); this is the eyeball-able sample, not the full set.
+      const reps = (card) => {
+        const all = intervalPlacements(card);
+        const ends = (dir) => {
+          const ps = all
+            .filter((p) => p.direction === dir)
+            .sort((a, b) => Math.min(...a.midis) - Math.min(...b.midis));
+          if (ps.length === 0) return [];
+          const out = [{ p: ps[0], reg: 'low' }];
+          if (ps.length > 1) out.push({ p: ps[ps.length - 1], reg: 'high' });
+          return out;
+        };
+        return [
+          ...ends('asc').map(({ p, reg }) => ({ p, label: `asc · ${reg}` })),
+          ...ends('desc').map(({ p, reg }) => ({ p, label: `desc · ${reg}` })),
+        ];
+      };
+      return buildIntervalDeck(settings).map((card) => ({
+        heading: `${card.name} · ${card.clef}`,
+        interval: true,
+        cells: reps(card).map(({ p, label }) => ({
+          label,
+          draw: (el) =>
+            drawInterval(vex, el, { clef: card.clef, keys: p.keys, accidentals: p.accidentals }),
+        })),
+      }));
     }
     // Chords: one group per card, all three inversions.
     return buildChordDeck(settings).map((card) => ({
@@ -136,6 +193,7 @@
       Dot: m.Dot,
       Formatter: m.Formatter,
       Voice: m.Voice,
+      KeySignature: m.KeySignature,
     };
   });
 </script>
@@ -173,7 +231,7 @@
     {#if group.heading}
       <h3 class="chord-head">{group.heading}</h3>
     {/if}
-    <div class="grid" class:chord={group.chord}>
+    <div class="grid" class:chord={group.chord} class:interval={group.interval}>
       {#each group.cells as cell}
         <figure class="cell">
           <div class="paper"><div class="staff" use:staff={{ draw: cell.draw, ready: !!vex }}></div></div>
@@ -257,6 +315,11 @@
   .grid.chord {
     grid-template-columns: repeat(3, minmax(150px, 1fr));
     max-width: 640px;
+  }
+  /* An interval's four samples sit in a 2×2 (asc row, desc row). */
+  .grid.interval {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    max-width: 440px;
   }
 
   .cell {

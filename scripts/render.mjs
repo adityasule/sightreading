@@ -18,6 +18,10 @@
 //   npm run render -- phase1 treble:60   # one Phase 1 card, by id
 //   npm run render -- chord         # a representative Phase 2 (Chords) set, each inversion
 //   npm run render -- chord treble:Bb:major  # one chord (all inversions), by id/key
+//   npm run render -- keysig        # a representative Phase 3 (Key Signatures) set
+//   npm run render -- keysig treble:F#   # one key signature, by id/key
+//   npm run render -- interval      # a representative Phase 4 (Intervals) set
+//   npm run render -- interval treble:TT # one interval, by id/key
 //   npm run render -- quarter       # shorthand: a Basics card by key/value/id
 //   npm run render -- --feedback    # tint as a correct answer (combine w/ above)
 //
@@ -61,9 +65,20 @@ const { buildBasicsDeck, buildDeck, basicsLabel } = await import(join(root, 'src
 const { buildChordDeck, chordVoicing, chordPlacements, INVERSIONS } = await import(
   join(root, 'src/lib/chords.js')
 );
-const { drawDurationNote, drawRest, drawClef, drawAccidental, drawNote, drawChord } = await import(
-  join(root, 'src/lib/render.js')
+const { buildKeySigDeck } = await import(join(root, 'src/lib/keysig.js'));
+const { buildIntervalDeck, intervalPlacements } = await import(
+  join(root, 'src/lib/intervals.js')
 );
+const {
+  drawDurationNote,
+  drawRest,
+  drawClef,
+  drawAccidental,
+  drawNote,
+  drawChord,
+  drawKeySignature,
+  drawInterval,
+} = await import(join(root, 'src/lib/render.js'));
 
 // The bundled font module is literally `export const Bravura = 'data:font/woff2…'`.
 const bravuraModule = readFileSync(
@@ -108,12 +123,22 @@ const PHASE1_SAMPLE = ['treble:60', 'bass:60', 'treble:61:#', 'treble:66:b'];
 // sharp major, a flat major, and one on bass — each rendered in all inversions.
 const CHORD_SAMPLE = ['treble:C:major', 'treble:A:minor', 'treble:E:major', 'treble:Bb:major', 'bass:C:major'];
 
+// Representative Phase 3 key signatures when no id is given: C (empty), a 1-sharp,
+// a 6-sharp, a 5-flat, and a 7-flat on bass — the spread of sizes across clefs.
+const KEYSIG_SAMPLE = ['treble:C', 'treble:G', 'treble:F#', 'treble:Db', 'bass:Cb'];
+
+// Representative Phase 4 intervals when no id is given: a perfect 5th, a major 3rd,
+// a minor 2nd, the tritone, an octave, and one on bass — across difficulty levels.
+const INTERVAL_SAMPLE = ['treble:P5', 'treble:M3', 'treble:m2', 'treble:TT', 'treble:P8', 'bass:M6'];
+
 const args = process.argv.slice(2);
 const feedback = args.includes('--feedback');
 const color = feedback ? '#16a34a' : null;
 const positionals = args.filter((a) => !a.startsWith('-'));
 
-const KINDS = new Set(['basics', 'note', 'rest', 'clef', 'accidental', 'phase1', 'chord']);
+const KINDS = new Set([
+  'basics', 'note', 'rest', 'clef', 'accidental', 'phase1', 'chord', 'keysig', 'interval',
+]);
 let kind, filter;
 if (positionals[0] && KINDS.has(positionals[0])) {
   [kind, filter] = positionals;
@@ -159,6 +184,32 @@ if (kind === 'phase1') {
       };
     })
   );
+} else if (kind === 'keysig') {
+  const deck = buildKeySigDeck({ treble: true, bass: true });
+  const cards = filter
+    ? deck.filter((c) => c.id === filter || c.key === filter)
+    : deck.filter((c) => KEYSIG_SAMPLE.includes(c.id));
+  // Key signatures carry no feedback tint (text glyphs; see drawKeySignature).
+  renderables = cards.map((card) => ({
+    label: `${card.name} (${card.clef})`,
+    file: `keysig-${slug(card.id)}.svg`,
+    draw: (el) => drawKeySignature(VexFlow, el, { clef: card.clef, spec: card.spec }),
+  }));
+} else if (kind === 'interval') {
+  const deck = buildIntervalDeck({ treble: true, bass: true });
+  const cards = filter
+    ? deck.filter((c) => c.id === filter || c.key === filter)
+    : deck.filter((c) => INTERVAL_SAMPLE.includes(c.id));
+  // The first placement is deterministic (ascending, lowest in-window base) — the
+  // app randomises direction + register; here we want stable, eyeballable output.
+  renderables = cards.map((card) => {
+    const { keys, accidentals } = intervalPlacements(card)[0];
+    return {
+      label: `${card.name} (${card.clef})`,
+      file: `interval-${slug(card.id)}.svg`,
+      draw: (el) => drawInterval(VexFlow, el, { clef: card.clef, keys, accidentals, color }),
+    };
+  });
 } else {
   let cards = buildBasicsDeck();
   if (kind !== 'basics') cards = cards.filter((c) => c.type === kind);
@@ -173,7 +224,8 @@ if (kind === 'phase1') {
 if (renderables.length === 0) {
   console.error(
     `Nothing to render for "${positionals.join(' ') || '(all)'}".\n` +
-      `Kinds: note | rest | clef | accidental | phase1 | chord (or a Basics key/value/id).`
+      `Kinds: note | rest | clef | accidental | phase1 | chord | keysig | interval ` +
+      `(or a Basics key/value/id).`
   );
   process.exit(1);
 }
