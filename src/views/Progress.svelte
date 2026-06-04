@@ -7,7 +7,7 @@
   import * as srs from '../lib/spaced-repetition.js';
   import { progress, MASTER_BOX } from '../lib/progression.js';
   import { PHASES } from '../lib/phases.js';
-  import { go } from '../lib/nav.svelte.js';
+  import { nav, go, openDetail, back } from '../lib/nav.svelte.js';
   import { loadVex, staff, drawForCard } from '../lib/cardRender.js';
 
   // Each phase's progress is read straight from its own srt:phaseN blob — no new
@@ -134,31 +134,31 @@
     return `${card.name} · ${card.clef}`;
   }
 
-  // Drill-down: which phase's card detail is open (null = the overview). VexFlow is
-  // loaded lazily the first time a drill-down opens, so the overview pays no cost.
-  let selected = $state(null);
+  // Drill-down: which phase's card detail is open lives in nav.detail, so the
+  // browser Back button closes the drill-down before leaving the Progress view.
+  // VexFlow loads lazily the first time a drill-down opens (the overview pays no
+  // cost); once loaded it's kept for the rest of the visit.
   let vex = $state(null);
+  $effect(() => {
+    if (nav.detail && !vex) loadVex().then((v) => (vex = v));
+  });
 
-  function openDetail(id) {
-    selected = id;
-    if (!vex) loadVex().then((v) => (vex = v));
-  }
-
-  // Every possible card in the selected phase, each with its representative glyph
+  // Every possible card in the open phase, each with its representative glyph
   // draw + per-card stats + whether it's been introduced to the deck. Rebuilt when
   // the phase or settings change; the glyph itself draws via the shared harness.
   const detail = $derived.by(() => {
-    if (!selected) return null;
-    const state = stateOf[selected];
-    const deck = deckOf[selected];
+    const phaseId = nav.detail;
+    if (!phaseId) return null;
+    const state = stateOf[phaseId];
+    const deck = deckOf[phaseId];
     return {
-      id: selected,
-      name: nameOf(selected),
+      id: phaseId,
+      name: nameOf(phaseId),
       aggregate: srs.aggregateStats(state),
       cells: deck.map((card) => ({
         card,
-        label: cardLabel(selected, card),
-        draw: (el) => drawForCard(vex, selected, card, el, settings),
+        label: cardLabel(phaseId, card),
+        draw: (el) => drawForCard(vex, phaseId, card, el, settings),
         stats: srs.cardStats(state, card.id),
         introduced: !!state.cards[card.id],
       })),
@@ -202,7 +202,7 @@
   <!-- Drill-down: every card in one phase, with its glyph + stats. -->
   <div class="view">
     <header class="intro detail-head">
-      <button type="button" class="back" onclick={() => (selected = null)}>← Progress</button>
+      <button type="button" class="back" onclick={back}>← Progress</button>
       <h2>{detail.name}</h2>
       {@render metrics(detail.aggregate, detail.name)}
       <button type="button" class="btn-primary practice" onclick={() => go(detail.id)}>
