@@ -2,6 +2,8 @@
   import { settings } from '../lib/settings.svelte.js';
   import { buildDeck, buildBasicsDeck } from '../lib/music.js';
   import { buildChordDeck, chordLevelsFor } from '../lib/chords.js';
+  import { buildKeySigDeck, keySigLevelsFor } from '../lib/keysig.js';
+  import { buildIntervalDeck, intervalLevelsFor } from '../lib/intervals.js';
   import * as srs from '../lib/spaced-repetition.js';
   import { progress, MASTER_BOX } from '../lib/progression.js';
   import { PHASES } from '../lib/phases.js';
@@ -13,10 +15,14 @@
   const phase0State = srs.loadState('srt:phase0');
   const phase1State = srs.loadState('srt:phase1');
   const phase2State = srs.loadState('srt:phase2');
+  const phase3State = srs.loadState('srt:phase3');
+  const phase4State = srs.loadState('srt:phase4');
 
   const basicsDeck = buildBasicsDeck();
   const notationDeck = $derived(buildDeck(settings));
   const chordDeck = $derived(buildChordDeck(settings));
+  const keysigDeck = $derived(buildKeySigDeck(settings));
+  const intervalDeck = $derived(buildIntervalDeck(settings));
 
   // "Mastered" everywhere means box ≥ 2 (answered correctly on two reviews) —
   // the same bar the curriculum uses for level completion, kept consistent so a
@@ -53,6 +59,34 @@
       currentLabel: p.current?.label ?? null,
       chordsMastered: srs.masteredCount(phase2State, chordDeck, MASTER_BOX),
       chordsTotal: chordDeck.length,
+    };
+  });
+
+  // Key Signatures: how far through the circle-of-fifths key curriculum (levels
+  // fully mastered) and how many individual signatures are mastered.
+  const keysigs = $derived.by(() => {
+    const p = progress(phase3State, keysigDeck, keySigLevelsFor);
+    return {
+      levelsDone: p.levels.filter((l) => srs.boxAtLeast(phase3State, l.cards, MASTER_BOX))
+        .length,
+      levelsTotal: p.levels.length,
+      currentLabel: p.current?.label ?? null,
+      mastered: srs.masteredCount(phase3State, keysigDeck, MASTER_BOX),
+      total: keysigDeck.length,
+    };
+  });
+
+  // Intervals: how far through the difficulty curriculum (levels fully mastered)
+  // and how many individual intervals are mastered.
+  const intervals = $derived.by(() => {
+    const p = progress(phase4State, intervalDeck, intervalLevelsFor);
+    return {
+      levelsDone: p.levels.filter((l) => srs.boxAtLeast(phase4State, l.cards, MASTER_BOX))
+        .length,
+      levelsTotal: p.levels.length,
+      currentLabel: p.current?.label ?? null,
+      mastered: srs.masteredCount(phase4State, intervalDeck, MASTER_BOX),
+      total: intervalDeck.length,
     };
   });
 
@@ -124,6 +158,40 @@
         chords.levelsTotal
       )}
       {@render bar('Chords mastered', chords.chordsMastered, chords.chordsTotal)}
+    {/if}
+  </button>
+
+  <button type="button" class="card phase" onclick={() => go('phase3')}>
+    <div class="phase-head">
+      <span class="badge">Now</span>
+      <h3>{nameOf('phase3')}</h3>
+    </div>
+    {#if keysigs.total === 0}
+      <p class="muted hint">No keys — enable a clef under Settings.</p>
+    {:else}
+      {@render bar(
+        keysigs.currentLabel ? `Key levels · ${keysigs.currentLabel}` : 'Key levels',
+        keysigs.levelsDone,
+        keysigs.levelsTotal
+      )}
+      {@render bar('Signatures mastered', keysigs.mastered, keysigs.total)}
+    {/if}
+  </button>
+
+  <button type="button" class="card phase" onclick={() => go('phase4')}>
+    <div class="phase-head">
+      <span class="badge">Now</span>
+      <h3>{nameOf('phase4')}</h3>
+    </div>
+    {#if intervals.total === 0}
+      <p class="muted hint">No intervals — enable a clef under Settings.</p>
+    {:else}
+      {@render bar(
+        intervals.currentLabel ? `Difficulty levels · ${intervals.currentLabel}` : 'Difficulty levels',
+        intervals.levelsDone,
+        intervals.levelsTotal
+      )}
+      {@render bar('Intervals mastered', intervals.mastered, intervals.total)}
     {/if}
   </button>
 

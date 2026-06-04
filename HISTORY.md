@@ -409,6 +409,62 @@ improvements.
   UI checks. (Playwright was reconsidered and again rejected — the binary weight
   and a standing e2e suite mismatch the project's manual-verify stance.)
 
+### Milestone 6 — Phase 3 (key signatures) + interval training ✅
+Two new quizzes — Phase 3 (Key Signatures) and Intervals (route id `phase4`) —
+each built feature-first on the Phase 0–2 shell with **no new architecture**: an
+engine module + a view + a render fn + wiring, the Chords (M5a–d) precedent. Both
+reuse the card-agnostic Leitner scheduler, the pluggable `progression.js` (via
+its `levelsFn` hook), the `Choices` pad, and the shared `render.js`. No backend,
+no new deps; VexFlow stays the lazy `vexflow-bravura` chunk (initial JS ~125KB /
+39KB gz, well under the 200KB NFR).
+- **M6a — Key Signatures (`src/lib/keysig.js`, `Phase3.svelte`).** Name the major
+  key from its signature. `KEY_SEQUENCE` is all 15 keys in circle-of-fifths order
+  (C, then alternating sharp/flat outward to 7♯ C♯ / 7♭ C♭ — extending the 11-level
+  Notation/Chords pattern; a *signature* card has no enharmonic-deck limit, so it
+  runs the full 15). One key per level. Each card carries a clef-independent
+  grading `key` (e.g. 'G', identical to the VexFlow `addKeySignature` spec) and is
+  per-clef (reuses the treble/bass setting). `buildKeySigDeck`/`KEYSIG_POOL`/
+  `keySigOptionLabel`/`keySigLevelsFor` mirror the chords.js exports.
+  `drawKeySignature` in render.js keeps the clef left-justified but draws the
+  signature **centred** in the bar (front-and-centre, not glued to the clef): a
+  *standalone* `KeySignature` whose `x` is set to the note-area centre — its
+  glyphs all render at that one `x` (see `KeySignature.draw`); C draws clef-only.
+  **No feedback tint** — the signature's accidentals are `<text>` glyphs VexFlow
+  can't recolour, so correct/wrong shows on the pad, the `drawClef` precedent.
+  `Phase3.svelte` is `Phase2.svelte` minus the voicing machinery (a signature
+  renders identically every showing).
+- **M6b — Intervals (`src/lib/intervals.js`, `Phase4.svelte`).** Name the interval
+  between two notes. `INTERVALS` is the 12 simple intervals (m2 M2 m3 M3 P4 TT P5
+  m6 M6 m7 M7 P8), each with `semitones` + diatonic `steps` for correct spelling
+  (the tritone is an augmented 4th). `INTERVAL_SEQUENCE` is 4 difficulty/consonance
+  levels — perfects, then thirds & sixths, then seconds & sevenths, the tritone
+  alone last. A card per (clef, interval); the note pair is the interval analogue
+  of a chord's voicing — `pickIntervalNotes(card, rng)` picks a random in-window
+  natural base + direction and spells the second note with a single accidental
+  (`intervalPlacements` enumerates all valid placements, always non-empty),
+  frozen per presentation so the feedback re-render redraws the same pair.
+  `drawInterval` draws two quarter notes left→right (so direction reads visually),
+  spread evenly across the bar (the two noteheads centred at ⅓ and ⅔ of the note
+  area via `placeNoteAt`, rather than letting the formatter bunch them left);
+  noteheads recolour for feedback, unlike a key signature. `Phase4.svelte` mirrors
+  `Phase2.svelte` (keeping the frozen-pick pattern).
+- **Wiring.** `phases.js` flips `phase3.ready` and adds the `phase4`/Intervals
+  entry, so nav + Home pick both up from `PHASES`; `App.svelte` maps `phase4`.
+  `Progress.svelte` gains two ready phase blocks (two bars each: level progression
+  + cards mastered), dropping both out of the locked-phase loop. The dev
+  `CardGallery` and the `render` script gained `keysig`/`interval` (Key
+  Signatures / Intervals) tabs and kinds, drawing through the same `render.js`;
+  the Intervals gallery shows a 96-card representative sample per (clef, interval)
+  — ascending + descending at a low and a high register (the quiz randomises
+  across all ~528 placements, so the gallery samples rather than enumerates).
+- 140 unit tests (up from 114): `keysig.test.js` (deck/levels/labels/pool, the
+  15-key sequence + signature wording) and `intervals.test.js` (deck/levels/pool,
+  the 4-level difficulty order, and `intervalPlacements` — exact span, base-first
+  direction, single-accidental natural-base spelling, in-window, both directions).
+  Verified end-to-end: `render -- keysig`/`-- interval` SVGs (C major = clef-only,
+  F♯ = 6 sharps, C♭ = 7 flats, octave = clean pair) and a headless-Chrome drive of
+  both views + the Progress view.
+
 ---
 
 ## Resolved design notes

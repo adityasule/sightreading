@@ -16,12 +16,13 @@ npm run dev      # vite dev server on :5173 (also on LAN — see README for phon
 npm run build    # production build → ./dist
 npm run preview  # serve ./dist on :4173
 npm test         # run the Vitest unit tests once (npm run test:watch to watch)
-npm run render   # render staff glyphs (Basics + Phase 1/2) to ./render-out/*.svg (dev-only)
+npm run render   # render staff glyphs (Basics + Phase 1/2/3 + Intervals) to ./render-out/*.svg (dev-only)
 npm run drive    # drive the app in a headless Chrome over CDP (dev-only smoke tests)
 ```
 **Vitest** (dev-only, never shipped) covers the pure-logic modules — `music.js`,
-`spaced-repetition.js`, `progression.js` — via colocated `src/lib/*.test.js`
-files. Run `npm test` after touching those. There is **no linter** configured,
+`spaced-repetition.js`, `progression.js`, `chords.js`, `keysig.js`,
+`intervals.js` — via colocated `src/lib/*.test.js` files. Run `npm test` after
+touching those. There is **no linter** configured,
 and the Svelte/UI components have no tests: "verify" the UI by running the app
 (`npm run dev`) and exercising the change in the browser.
 
@@ -30,10 +31,11 @@ self-contained SVGs via Node + jsdom, going through the same `src/lib/render.js`
 the app uses (so output can't drift) and embedding the Bravura font so each SVG
 opens anywhere. It's for *fast iteration* on the rendering — the browser is
 still the source of truth for correctness. `npm run render` emits all Basics
-cards (notes/rests/clefs/accidentals); `-- note|rest|clef|accidental|phase1|chord`
-narrows by kind, an optional second arg filters by key/value/id (`-- rest
-quarter`, `-- phase1 treble:60`), and `-- --feedback` tints. Output dir is
-git-ignored.
+cards (notes/rests/clefs/accidentals);
+`-- note|rest|clef|accidental|phase1|chord|keysig|interval` narrows by kind, an
+optional second arg filters by key/value/id (`-- rest quarter`, `-- phase1
+treble:60`, `-- keysig treble:F#`, `-- interval treble:TT`), and `-- --feedback`
+tints. Output dir is git-ignored.
 
 **`drive`** (dev-only, never shipped) launches the *installed* Chrome headless
 and talks CDP over Node's global `WebSocket`/`fetch` (no Puppeteer/Playwright) —
@@ -48,11 +50,18 @@ for UI checks.
 Svelte 5 + Vite SPA. View-switching by simple state, no router.
 
 - `src/main.js` — Svelte mount; `src/App.svelte` — shell, nav + view switching.
-- `src/views/` — one component per nav section: `Home`, `Phase1` (the only
-  built quiz), `Phase2`, `Phase3` (placeholders), `Settings`.
+- `src/views/` — one component per nav section: `Home`, `Phase0` (Basics),
+  `Phase1` (Notation), `Phase2` (Chords), `Phase3` (Key Signatures), `Phase4`
+  (Intervals), `Progress`, `Settings`. All quizzes are built.
 - `src/lib/`
   - `music.js` — MIDI↔note helpers, `buildDeck(settings)`, and the scale
     curriculum (`SCALE_SEQUENCE`, `levelsFor`, `isOnStaff`).
+  - `chords.js` / `keysig.js` / `intervals.js` — per-phase engine modules (pure
+    deck + curriculum data) for Chords / Key Signatures / Intervals; each exports
+    a `build*Deck`, an option pool + labels, and a `*LevelsFor` bucketer passed to
+    `progression.js` as its `levelsFn`. Same shape, so a new phase copies one.
+  - `render.js` — VexFlow-free shared staff rendering (one `draw*` per card kind),
+    used by both the quiz views and the dev `render` script (output can't drift).
   - `spaced-repetition.js` — generic Leitner scheduler. **Keep it
     card-agnostic** (no knowledge of notes/chords/levels) so every phase reuses
     it and the SM-2 swap stays local. Key fns: `pickNext` (takes an optional
@@ -65,13 +74,15 @@ Svelte 5 + Vite SPA. View-switching by simple state, no router.
 - `src/app.css` — global styles + dark-mode theme tokens.
 
 ## Conventions that matter
-- **"Phase 1/2/3" is dev shorthand — never show it in the UI.** Users see
-  musical names (Notation / Chords / Key Signatures); the mapping lives in
-  `phases.js`. Internal route ids (`phase1`) and storage keys (`srt:phase1`)
-  stay as-is.
+- **"Phase 0/1/2/3/4" is dev shorthand — never show it in the UI.** Users see
+  musical names (Basics / Notation / Chords / Key Signatures / Intervals); the
+  mapping lives in `phases.js`. Internal route ids (`phase1`) and storage keys
+  (`srt:phase1`) stay as-is.
 - **State** persists as one JSON blob per phase in `localStorage` (`srt:phase1`).
-- **VexFlow font race:** await `VexFlow.loadFonts('Bravura', 'Academico')`
-  before the first render or first-paint glyph metrics are wrong.
+- **VexFlow font race:** the app imports the font-bundled `vexflow/bravura` build
+  and gates the first render on `document.fonts.load("1em 'Bravura'")` (+ Academico),
+  **not** `VexFlow.loadFonts(...)` — the latter re-fetches from the CDN the bundled
+  build exists to avoid (M5e). Skipping the gate gives wrong first-paint metrics.
 - Hand-rolled CSS only — no Tailwind / UI library (keeps the bundle small).
 - Mobile-first: side nav ≥760px, hamburger drawer below; 44px min touch targets.
 

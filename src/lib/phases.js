@@ -26,6 +26,12 @@ export const PHASES = [
     id: 'phase3',
     name: 'Key Signatures',
     blurb: 'Name the major key from its signature.',
-    ready: false,
+    ready: true,
+  },
+  {
+    id: 'phase4',
+    name: 'Intervals',
+    blurb: 'Name the interval between two notes — multiple choice.',
+    ready: true,
   },
 ];

@@ -5,6 +5,7 @@
   import Phase1 from './views/Phase1.svelte';
   import Phase2 from './views/Phase2.svelte';
   import Phase3 from './views/Phase3.svelte';
+  import Phase4 from './views/Phase4.svelte';
   import Progress from './views/Progress.svelte';
   import Settings from './views/Settings.svelte';
   import ThemeButton from './lib/ThemeButton.svelte';
@@ -13,7 +14,13 @@
 
   // Phase labels come from the shared config; Home/Settings/etc. wraps it so a
   // rename lives in one place. Internal route ids are untouched.
-  const components = { phase0: Phase0, phase1: Phase1, phase2: Phase2, phase3: Phase3 };
+  const components = {
+    phase0: Phase0,
+    phase1: Phase1,
+    phase2: Phase2,
+    phase3: Phase3,
+    phase4: Phase4,
+  };
 
   // Dev-only "Cards" gallery: loaded via a dynamic import gated on import.meta.env.DEV
   // (statically `false` in a production build, so Rollup drops both the import and

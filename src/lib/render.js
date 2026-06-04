@@ -3,8 +3,9 @@
 // same code that ships, and can't drift from what the user actually sees.
 //
 // Covers every glyph the project draws: the Basics (Phase 0) note / rest / clef /
-// accidental cards, the Phase 1 (Notation) single note, and the Phase 2 (Chords)
-// triad. Each function is given the
+// accidental cards, the Phase 1 (Notation) single note, the Phase 2 (Chords)
+// triad, the Phase 3 (Key Signatures) signature, and the Phase 4 (Intervals)
+// note pair. Each function is given the
 // `VexFlow` module rather than importing it: both the app and the script
 // dynamic-import the font-bundled `vexflow/bravura` build (Bravura + Academico
 // embedded as data URIs — no runtime CDN fetch; M5e), the app as a lazy chunk.
@@ -62,6 +63,38 @@ function centerNote(stave, note) {
     const target = stave.getNoteStartX() + (avail - w) / 2;
     const tc = note.getTickContext();
     tc.setX(tc.getX() + (target - left));
+  }
+}
+
+/**
+ * Shift a formatted note so its notehead's *centre* lands at `targetCenterX`.
+ * The single-target sibling of `centerNote` — used by the Intervals card to
+ * spread its two notes evenly across the bar rather than let the formatter bunch
+ * them at the left. Moves the tick context (not xShift), so any accidental stays
+ * glued to the head (see centerNote for why). Notehead width via getGlyphWidth(),
+ * falling back to the bounding box under the render script's stubbed metrics.
+ */
+function placeNoteAt(note, targetCenterX) {
+  let left = null;
+  let w = 0;
+  try {
+    const glyphW = note.getGlyphWidth();
+    if (glyphW > 0) {
+      left = note.getNoteHeadBeginX();
+      w = glyphW;
+    } else {
+      const bb = note.getBoundingBox();
+      if (bb) {
+        left = bb.getX();
+        w = bb.getW();
+      }
+    }
+  } catch {
+    left = null; // metrics unavailable — leave as formatted, still legible
+  }
+  if (left !== null && w > 0) {
+    const tc = note.getTickContext();
+    tc.setX(tc.getX() + (targetCenterX - w / 2 - left));
   }
 }
 
@@ -271,6 +304,93 @@ export function drawChord(
   // (worst on low voicings with ledger lines); centre its noteheads in the note
   // area (the accidental hangs to their left). See centerNote.
   centerNote(stave, note);
+
+  voice.draw(ctx, stave);
+}
+
+/**
+ * Draw a Phase 3 (Key Signatures) signature: `spec` (a VexFlow key name, e.g.
+ * 'G', 'Bb', 'F#', 'Cb') on the given `clef`, via the stave's own key-signature
+ * modifier (the same machinery real notation uses). 'C' draws clef-only (no
+ * accidentals) — a valid "name the key" card.
+ *
+ * Like the clef card there is no feedback tint: VexFlow 5 draws the signature's
+ * accidentals as `<text>` glyphs the drawing context can't recolour after the
+ * fact, and tinting the whole staff would look wrong. Key-sig cards convey
+ * correct/wrong through the answer buttons instead.
+ */
+export function drawKeySignature(VexFlow, element, { clef, spec } = {}) {
+  const { Renderer, Stave, KeySignature } = VexFlow;
+  element.innerHTML = '';
+  const renderer = new Renderer(element, Renderer.Backends.SVG);
+  renderer.resize(320, 150);
+  const ctx = renderer.getContext();
+
+  const stave = new Stave(10, 35, 300).addClef(clef);
+  stave.setContext(ctx).draw();
+
+  // A key signature is normally a BEGIN modifier glued to the clef. Here we keep
+  // the clef left-justified but want the signature front-and-centre, so we draw
+  // it as a *standalone* KeySignature and set its `x` to the centre of the note
+  // area (its glyphs all render at `this.x` — see KeySignature.draw). C major has
+  // no accidentals, so it's clef-only (nothing to centre).
+  if (spec && spec !== 'C') {
+    const keySig = new KeySignature(spec);
+    keySig.setStave(stave);
+    keySig.format(); // resolves the accidental glyphs + the signature's width
+    const area = stave.getNoteEndX() - stave.getNoteStartX();
+    keySig.x = stave.getNoteStartX() + Math.max(0, (area - keySig.getWidth()) / 2);
+    keySig.setContext(ctx).draw();
+  }
+}
+
+/**
+ * Draw a Phase 4 (Intervals) note pair: the two `keys` (vex keys, *first note
+ * first* — the base, then the note above/below it) on the given `clef`, drawn
+ * left→right so the pair reads in its direction (ascending / descending).
+ * `accidentals` is `[{ index, type }]` where `index` is 0|1 (which of the two
+ * notes) and `type` is '#' | 'b'. Drawn as two quarter notes; `color` tints both
+ * noteheads for answer feedback (noteheads, unlike a key signature, recolour).
+ * `ledgerLines` sizes the vertical margin so wide / high / low intervals aren't
+ * clipped (a pair can reach an octave). The pitches come from `pickIntervalNotes`
+ * in intervals.js, so this stays a pure draw step.
+ */
+export function drawInterval(
+  VexFlow,
+  element,
+  { clef, keys, accidentals = [], ledgerLines = 3, color = null } = {}
+) {
+  const { Renderer, Stave, StaveNote, Accidental, Formatter, Voice } = VexFlow;
+  element.innerHTML = '';
+  const renderer = new Renderer(element, Renderer.Backends.SVG);
+  const margin = 44 + ledgerLines * 12;
+  renderer.resize(320, margin * 2 + 44);
+  const ctx = renderer.getContext();
+
+  const stave = new Stave(10, margin, 300).addClef(clef);
+  stave.setContext(ctx).draw();
+
+  // One StaveNote per pitch, so they sit side by side (a melodic pair) rather
+  // than stacked (a chord). Attach the stave up front so each note's metrics are
+  // resolved before drawing.
+  const notes = keys.map((key) => new StaveNote({ clef, keys: [key], duration: 'q' }));
+  for (const { index, type } of accidentals) notes[index].addModifier(new Accidental(type), 0);
+  for (const note of notes) {
+    note.setStave(stave);
+    if (color) note.setStyle({ fillStyle: color, strokeStyle: color });
+  }
+
+  const voice = new Voice({ numBeats: 2, beatValue: 4 }).addTickables(notes);
+  new Formatter().joinVoices([voice]).format([voice], 220);
+
+  // Spread the pair evenly across the note area (three equal gaps) instead of
+  // letting the formatter bunch them at the left — the two noteheads centre at
+  // ⅓ and ⅔ of the bar. Each note has its own tick context, so they move
+  // independently (their accidentals follow). See placeNoteAt.
+  const start = stave.getNoteStartX();
+  const area = stave.getNoteEndX() - start;
+  placeNoteAt(notes[0], start + area / 3);
+  placeNoteAt(notes[1], start + (2 * area) / 3);
 
   voice.draw(ctx, stave);
 }
