@@ -8,9 +8,14 @@
 
 # The HTML entry is the un-fingerprinted bootstrap that points at the current
 # asset hashes, so it must always be revalidated for a new deploy to propagate.
-# (When the PWA service worker ships in M5, add its path here with no-cache too,
-# so a deploy is never pinned by a stale cached worker.)
 /
   Cache-Control: no-cache
 /index.html
+  Cache-Control: no-cache
+
+# The PWA service worker (M7e) and the un-fingerprinted manifest must always be
+# revalidated too, so a new deploy is never pinned by a stale cached worker.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
   Cache-Control: no-cache

@@ -79,8 +79,10 @@ so re-check it if the page stops loading.
 - **Can't connect at all** — confirm both devices are on the same Wi-Fi (not a
   "guest" network, and not one with *client isolation* enabled). The first
   time, macOS may prompt to allow incoming connections — accept it.
-- **Page loads but looks stale** — hard-refresh on the device; the dev server
-  hot-reloads, but a cached service worker (added later) can interfere.
+- **Page loads but looks stale** — hard-refresh on the device. `npm run dev`
+  registers **no** service worker, so HMR is never shadowed; the production
+  build ships a PWA service worker that auto-updates (network-first for the
+  HTML), so a stale view clears on the next load or a hard refresh.
 
 ## Deploying to Cloudflare Workers
 
@@ -110,6 +112,20 @@ back to `index.html` via `not_found_handling` in `wrangler.jsonc`.
 No backend, no environment secrets, no API keys. The free Workers tier covers
 this app's expected usage by orders of magnitude.
 
+## Offline / install (PWA)
+
+The production build is an installable, offline-capable PWA (`vite-plugin-pwa` +
+Workbox — a **dev-only build dependency**; it emits a static, versioned service
+worker, so there's no runtime third-party call and the no-backend constraint
+holds). The worker precaches the app shell and the lazy `vexflow-bravura` chunk
+(fonts inlined since the music-font self-hosting work), so the app **and its
+staff rendering work fully offline** once loaded. It's network-first for
+navigations and `autoUpdate`, and `/sw.js` is served `no-cache` (see
+[`public/_headers`](./public/_headers)) so a deploy is never pinned by a stale
+cached worker. The icons + web manifest are generated from `public/icon.svg` by
+`@vite-pwa/assets-generator`. `npm run dev` registers **no** service worker (to
+keep HMR clean) — verify the PWA via `npm run build` + `npm run preview`.
+
 ## Project structure
 
 View files keep the dev shorthand `PhaseN`; users see musical names (Phase 0 →
@@ -122,7 +138,9 @@ HISTORY.md                shipped milestones + resolved design notes
 CLAUDE.md                 working guidance for this repo
 index.html                Vite entry
 wrangler.jsonc            Cloudflare Workers config (static assets + SPA fallback)
-public/_headers           Cloudflare cache-control rules (immutable assets, no-cache HTML)
+pwa-assets.config.js      PWA icon generation config (dev-only; one source SVG → all sizes)
+public/_headers           Cloudflare cache-control rules (immutable assets, no-cache HTML + SW)
+public/icon.svg           app icon source (treble clef) → generated PWA icons + favicon
 scripts/render.mjs        dev-only staff-glyph SVG renderer (npm run render)
 src/
   main.js                 Svelte 5 mount

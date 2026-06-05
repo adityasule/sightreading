@@ -16,8 +16,8 @@
 //   --headed (show the window). $CHROME overrides the Chrome binary path.
 //
 // As a module it also exports `connect()` returning a small driver — connect →
-// navigate → seedLocalStorage → clickByText → eval → screenshot → close — for
-// ad-hoc scenarios:
+// navigate → seedLocalStorage → clickByText → eval → setOffline → reload →
+// screenshot → close — for ad-hoc scenarios:
 //
 //   import { connect } from './scripts/drive.mjs';
 //   const b = await connect();
@@ -43,8 +43,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Launch a headless Chrome and attach to its first page target over CDP.
- * Returns a driver with navigate/eval/clickByText/seedLocalStorage/screenshot/
- * waitFor/close. `size` is the viewport "WxH"; `headed` shows the window.
+ * Returns a driver with navigate/eval/clickByText/seedLocalStorage/setOffline/
+ * reload/waitFor/screenshot/close. `size` is the viewport "WxH"; `headed` shows
+ * the window.
  */
 export async function connect({ size = '900x1400', headed = false } = {}) {
   const [w, h] = size.split('x').map((n) => parseInt(n, 10));
@@ -193,6 +194,27 @@ export async function connect({ size = '900x1400', headed = false } = {}) {
         `(() => { const e = ${JSON.stringify(entries)};
            for (const k in e) localStorage.setItem(k, e[k]); })()`
       );
+      const loaded = once('Page.loadEventFired');
+      await send('Page.reload');
+      await loaded;
+    },
+
+    /**
+     * Toggle network offline/online via CDP (for verifying the PWA service
+     * worker serves from its precache). `true` = offline.
+     */
+    async setOffline(offline) {
+      await send('Network.enable');
+      await send('Network.emulateNetworkConditions', {
+        offline,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      });
+    },
+
+    /** Reload the current page and resolve once the load event fires. */
+    async reload() {
       const loaded = once('Page.loadEventFired');
       await send('Page.reload');
       await loaded;

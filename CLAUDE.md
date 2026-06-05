@@ -42,9 +42,10 @@ and talks CDP over Node's global `WebSocket`/`fetch` (no Puppeteer/Playwright) �
 the committed form of the M2e smoke-test. CLI: `npm run drive -- shot <url>
 [out.png]` and `npm run drive -- eval <url> "<expr>"`; imported, it exports
 `connect()` → a driver (`navigate`/`seedLocalStorage`/`clickByText`/`eval`/
-`waitFor`/`screenshot`/`close`) for scripted scenarios. Needs a running dev
-server; `$CHROME` overrides the binary. The browser stays the source of truth
-for UI checks.
+`setOffline`/`reload`/`waitFor`/`screenshot`/`close`) for scripted scenarios
+(`setOffline` toggles CDP network-offline — used to verify the M7e PWA precache).
+Needs a running dev server; `$CHROME` overrides the binary. The browser stays the
+source of truth for UI checks.
 
 ## Architecture
 Svelte 5 + Vite SPA. View-switching by simple state, no router.

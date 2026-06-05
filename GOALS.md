@@ -388,21 +388,31 @@ shell (`© 2026 Aditya Sule · MIT License`) with a **GitHub** link
 (`github.com/adityasule/sightreading`) and a **LinkedIn** link
 (`https://www.linkedin.com/in/aditya-sule/`).
 
-**M7e — PWA (manifest + service worker + icons)** *(was M5g; nice-to-have per
-NFRs, not blocking).* Offline-capable install:
-- **`vite-plugin-pwa` (Workbox)** generates a **versioned** service worker +
-  precache manifest from the build (handles hashed asset names), precaching the
-  app shell and the lazy `vexflow-bravura` chunk. A dev-only build dependency —
-  no runtime third-party call, so the no-backend constraint holds. Its
-  prerequisite (no runtime CDN font fetch) is satisfied by M5e, so offline is
-  genuinely offline.
-- Add **app icons** (none exist today) — at least 192/512 + maskable — and the
-  web app manifest (name, theme/background colors matching the existing
-  `theme-color`, display `standalone`).
-- Keep the worker conservative about staleness (**network-first for the HTML** /
-  versioned precache) so a deploy is never pinned by a stale cached worker; add
-  the SW path to `public/_headers` with `no-cache` (the header file already notes
-  this).
+**M7e — PWA (manifest + service worker + icons) ✅ shipped** *(was M5g;
+nice-to-have per NFRs, not blocking).* Offline-capable install, layered onto the
+existing static build with no new architecture:
+- **`vite-plugin-pwa` (Workbox, `generateSW`)** — a dev-only build dependency
+  (it emits a static, versioned worker, so there's no runtime third-party call
+  and the no-backend constraint holds). `registerType: 'autoUpdate'`, self-
+  registered in `main.js` via `virtual:pwa-register`, precaches the app shell +
+  the lazy `vexflow-bravura` chunk (711 KB, under Workbox's 2 MiB default — fonts
+  inlined since M5e, so offline is genuinely offline, staff rendering included).
+  A **NetworkFirst** navigation route keeps the HTML network-first with the
+  precache as the offline fallback; `cleanupOutdatedCaches` + `inlineWorkboxRuntime`.
+  *Gotcha:* `webmanifest` is left out of `globPatterns` — vite-plugin-pwa already
+  precaches the manifest, and the duplicate makes the worker throw on evaluation.
+- **Icons + manifest from one source** — `public/icon.svg` (a white treble clef
+  on the teal accent, full-bleed for maskable safety) feeds
+  `@vite-pwa/assets-generator` (`minimal-2023` preset) → favicon, apple-touch,
+  and 64/192/512 + maskable PWA icons, auto-injected into the head and merged
+  into the manifest (`name` "Sight Reading Trainer", `short_name` "SightRead",
+  `display: standalone`, theme/background `#fbfbfa`).
+- **Never pinned by a stale worker** — `/sw.js` + `/manifest.webmanifest` added
+  to `public/_headers` as `no-cache`, so the browser revalidates the worker each
+  load. `npm run dev` stays SW-free (devOptions off, so HMR isn't shadowed);
+  verified via build + preview + a headless-Chrome **offline reload** (the
+  `drive` helper gained `setOffline`/`reload`): shell + Notation staff glyph
+  render with the network cut.
 
 **M7f — Docs cleanup & simplification.** The close-out: collapse the already-
 shipped Phase 2/3/Intervals in-scope detail in this file to one-liners pointing
