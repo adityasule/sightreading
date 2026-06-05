@@ -154,6 +154,15 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    /* Stay pinned to the top so the hamburger/title are always reachable while
+       the page scrolls. The .layout grid scrolls with the document, so sticky
+       resolves against the viewport. Opaque bg (header was transparent) keeps
+       scrolling content from showing through; z-index sits below the drawer +
+       scrim (20/30) so an open drawer still covers it. */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
     /* Clear the status bar / notch (top) and a landscape side notch
        (left/right). env() is 0 on devices without cutouts, so this is a no-op
        on desktop. The bottom edge is the footer's job (see below). */
