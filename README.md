@@ -4,6 +4,8 @@ A static, client-side web app for learning to sight-read music with spaced
 repetition. Open source under the [MIT License](./LICENSE). See
 [GOALS.md](./GOALS.md) for the full plan, scope, and phases.
 
+**Disclaimer: This is a purely vibe coded project to test the limits of LLMs. I assume no responsibility for any generated code or text in this project**
+
 ## Local development
 
 ```bash
@@ -24,6 +26,9 @@ ships. `-- note|rest|clef|accidental|phase1|chord|keysig|interval` narrows by
 kind; a second arg filters by key/value/id; `-- --feedback` tints. The browser is
 still the source of truth — this just shortens the loop.
 
+- **LAN / phone testing:** the dev server can be accessed over the local network
+  — any device on the same Wi-Fi can open the `Network:` URL `npm run dev` prints.
+
 ## Tests
 
 [Vitest](https://vitest.dev) unit-tests the pure-logic modules (`music.js`,
@@ -39,50 +44,6 @@ npm run test:watch  # re-run on change while developing
 
 Vitest is a dev dependency and never ships in the build; the UI/Svelte
 components are verified manually by running the app.
-
-## Testing on your phone / iPad (same Wi-Fi)
-
-The dev and preview servers bind to all interfaces, so any device on the
-**same Wi-Fi network** can open the app. Because a Mac's IP is handed out by
-DHCP and changes, use its **Bonjour hostname** instead of a raw IP — that name
-stays stable across reconnects.
-
-1. Find the Mac's hostname: `scutil --get LocalHostName` (call it `<name>`).
-2. Connect the phone/iPad to the **same Wi-Fi** as the Mac.
-3. Start the server: `npm run dev` (it prints a `Network:` URL too).
-4. On the device, open:
-
-   ```
-   http://<name>.local:5173
-   ```
-
-The production preview now runs under the Workers runtime: `npm run preview`
-builds and serves the app at `http://localhost:8787` (localhost only — not
-exposed on the LAN). For on-device testing use the dev server (`npm run dev`)
-on :5173, which is LAN-exposed as described above.
-
-### If `.local` doesn't resolve
-
-Some networks (or Android, which lacks built-in mDNS) won't resolve the
-`.local` name. Fall back to the current IP address — look at the `Network:`
-line Vite prints, or run:
-
-```bash
-ipconfig getifaddr en0    # Wi-Fi IP, e.g. 192.168.1.42
-```
-
-Then browse to `http://<that-ip>:5173`. This IP can change after a reconnect,
-so re-check it if the page stops loading.
-
-### Troubleshooting
-
-- **Can't connect at all** — confirm both devices are on the same Wi-Fi (not a
-  "guest" network, and not one with *client isolation* enabled). The first
-  time, macOS may prompt to allow incoming connections — accept it.
-- **Page loads but looks stale** — hard-refresh on the device. `npm run dev`
-  registers **no** service worker, so HMR is never shadowed; the production
-  build ships a PWA service worker that auto-updates (network-first for the
-  HTML), so a stale view clears on the next load or a hard refresh.
 
 ## Deploying to Cloudflare Workers
 
@@ -133,7 +94,7 @@ Basics, Phase 1 → Notation, Phase 2 → Chords, Phase 3 → Key Signatures, Ph
 Intervals — the mapping lives in `src/lib/phases.js`).
 
 ```
-GOALS.md                  forward-looking plan + scope
+GOALS.md                  vision, requirements, architecture decision + scope
 HISTORY.md                shipped milestones + resolved design notes
 CLAUDE.md                 working guidance for this repo
 index.html                Vite entry
@@ -142,10 +103,11 @@ pwa-assets.config.js      PWA icon generation config (dev-only; one source SVG �
 public/_headers           Cloudflare cache-control rules (immutable assets, no-cache HTML + SW)
 public/icon.svg           app icon source (treble clef) → generated PWA icons + favicon
 scripts/render.mjs        dev-only staff-glyph SVG renderer (npm run render)
+scripts/drive.mjs         dev-only headless-Chrome CDP driver (npm run drive)
 src/
-  main.js                 Svelte 5 mount
+  main.js                 Svelte 5 mount + service-worker registration
   app.css                 global styles, dark-mode tokens
-  App.svelte              shell: nav, view switching, error boundary
+  App.svelte              shell: nav, view switching, footer, error boundary
   views/                  one component per nav section
     Home.svelte           today's due/new/learned snapshot + quick actions
     Phase0.svelte         Basics — multiple-choice duration/rest/clef/accidental quiz
@@ -153,26 +115,30 @@ src/
     Phase2.svelte         Chords — major/minor triad recognition quiz
     Phase3.svelte         Key Signatures — name-the-major-key quiz
     Phase4.svelte         Intervals — name-the-interval quiz
-    Progress.svelte       cross-phase completion bars
-    Settings.svelte       theme, answer mode, clefs, new-cards-per-day, naming
+    Progress.svelte       cross-phase progress bars + per-card stats drill-down
+    Settings.svelte       theme, answer mode, clefs, new-cards-per-day, naming, backup
   lib/
     music.js              MIDI↔note helpers, buildDeck/buildBasicsDeck, curriculum
     chords.js             Chords engine — deck + circle-of-fifths curriculum
     keysig.js             Key Signatures engine — deck + circle-of-fifths curriculum
     intervals.js          Intervals engine — deck + difficulty curriculum
-    spaced-repetition.js  generic, card-agnostic Leitner scheduler
+    spaced-repetition.js  generic, card-agnostic Leitner scheduler + per-card stats
     progression.js        curriculum layer on top of the scheduler (pluggable levelsFn)
     render.js             shared VexFlow staff renderer (app + render script)
+    cardRender.js         shared VexFlow boot + draw dispatch (Progress drill-down + dev gallery)
+    transfer.js           state export/import (versioned JSON backup file)
     phases.js             phase id ↔ display-name single source of truth
     settings.svelte.js    reactive, persisted quiz settings
-    nav.svelte.js         nav/drawer state
+    nav.svelte.js         nav/drawer + drill-down state
     theme.svelte.js       light/dark/system theme state
     Choices.svelte        reusable multiple-choice answer pad
     Piano.svelte          one-octave piano input
     QuizSettings.svelte   field-driven in-quiz quick settings
-    ThemeButton.svelte    theme cycle button
-    ThemeToggle.svelte    theme toggle control
+    ThemeButton.svelte    header theme-cycle button
+    ThemeToggle.svelte    Settings theme segmented control
     *.test.js             colocated Vitest unit tests (dev-only)
+  dev/
+    CardGallery.svelte    dev-only "Cards" gallery (import.meta.env.DEV-gated)
 ```
 
 ## License

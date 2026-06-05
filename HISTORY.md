@@ -465,6 +465,70 @@ no new deps; VexFlow stays the lazy `vexflow-bravura` chunk (initial JS ~125KB /
   F♯ = 6 sharps, C♭ = 7 flats, octave = clean pair) and a headless-Chrome drive of
   both views + the Progress view.
 
+### Milestone 7 — Refinement ✅
+A polish pass on the shipped app — richer Progress analytics, state export/import,
+an attribution footer, the PWA, and a docs close-out. Sequenced feature/enabler
+first, productionization last (the M2/M5 precedent); no new architecture, every
+slice layered onto the Phase 0–6 shell.
+- **M7a — Per-card stats instrumentation (enabler).** The behaviour page needed
+  per-card accuracy + time-to-answer, neither captured before (card state was just
+  `{ box, dueAt }`; `history` a per-day aggregate). Extended each card with compact
+  running totals — `seen`, `correct`, and total answer `timeMs` (average = total ÷
+  count, so no per-answer event log). All five quiz views time `showCard`→`answer`
+  and thread it through the one choke point, `recordAnswer(state, id, correct,
+  elapsedMs)`, so the scheduler stays card-agnostic. Plus per-phase aggregate
+  helpers for M7b. `STATE_VERSION` 1→2, go-forward (new fields default to 0/absent,
+  no backfill). Unit tests.
+- **M7b — Progress stats redesign + Cards merge.** Reworked the Progress view onto
+  the M7a aggregates. Overview keeps the per-phase bars and adds an app-wide metrics
+  band — average accuracy + average time, summed from each phase's *raw* totals so
+  the figure weights by answer volume, not by averaging five percentages (new
+  `rawTotals`/`statsFromTotals`, with `aggregateStats` refactored onto them).
+  Clicking a phase opens a drill-down of every possible card — introduced-or-not,
+  per-card accuracy + avg time, as a glyph + stats grid (un-introduced dimmed), plus
+  the phase aggregate and a Practice jump. The dev gallery's VexFlow boot + draw
+  dispatch moved to `src/lib/cardRender.js` (`loadVex`, the `staff` action,
+  `drawForCard`) so the production drill-down and the dev **Cards (dev)** gallery
+  draw through the *same* path (output can't drift); VexFlow boots lazily on the
+  first drill-down. The dev gallery stays `import.meta.env.DEV`-gated.
+- **M7c — Export / import state + state-efficiency audit.** The opt-in cross-device
+  transfer escape hatch (`src/lib/transfer.js`): `buildExport` bundles all `srt:*`
+  keys (five phases + settings + theme) into one versioned JSON file (Blob + anchor,
+  no backend); `parseAndValidate` rejects bad JSON, app/version mismatches and
+  per-blob future-versions **atomically**; `applyImport` *replaces* this device's
+  managed keys (a clean replace, not a stale merge); Settings confirms then reloads.
+  64 transfer unit tests (round-trip, idempotency, atomicity, prototype-pollution).
+  Efficiency audit: the unbounded per-day `history` map now prunes to a 90-day
+  window, folding older days into a `lifetime` roll-up so lifetime accuracy stays
+  exact. `STATE_VERSION` 2→3, go-forward.
+- **M7d — Attribution footer.** A copyright/license footer in the app shell
+  (`© 2026 Aditya Sule · MIT License`) with GitHub + LinkedIn links.
+- **M7e — PWA (manifest + service worker + icons)** *(was M5g; nice-to-have per the
+  NFRs, not blocking).* Offline-capable install via `vite-plugin-pwa` (Workbox
+  `generateSW`) — a **dev-only build dependency** emitting a static, versioned
+  worker, so there's no runtime third-party call and the no-backend constraint
+  holds. `registerType: 'autoUpdate'`, self-registered in `main.js` via
+  `virtual:pwa-register`; precaches the app shell + the lazy `vexflow-bravura` chunk
+  (fonts inlined since M5e, so offline is genuinely offline, staff rendering
+  included); a NetworkFirst navigation route keeps the HTML network-first with the
+  precache as offline fallback. Icons + manifest generated from one `public/icon.svg`
+  (a white treble clef on the teal accent, full-bleed for maskable safety) by
+  `@vite-pwa/assets-generator`. `/sw.js` + `/manifest.webmanifest` served `no-cache`
+  (`public/_headers`) so a stale worker never pins a deploy; `npm run dev` stays
+  SW-free (HMR isn't shadowed). *Gotcha:* leave `webmanifest` out of `globPatterns`
+  — vite-plugin-pwa already precaches it, and the duplicate makes the worker throw
+  on evaluation. Verified via build + preview + a headless-Chrome offline reload
+  (shell + Notation staff render with the network cut).
+- **M7f — Docs cleanup & simplification.** Collapsed the shipped-phase scope in
+  GOALS.md to one-line pointers (the detail lives here) and moved the M7 milestone
+  record GOALS → HISTORY, leaving GOALS as the enduring vision / NFR / architecture
+  / scope doc; refreshed the README project-structure block (it predated
+  `cardRender.js`, `transfer.js`, the dev `CardGallery`, and the `drive` helper) and
+  trimmed README/CLAUDE overlap; corrected stale in-code doc pointers (the
+  progression rationale lives in HISTORY, not GOALS). An app audit — 221 unit tests,
+  a clean production build, and a read-through of every engine module + view — found
+  no bugs and no code cleanup warranted, so the close-out is docs-only.
+
 ---
 
 ## Resolved design notes

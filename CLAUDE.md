@@ -14,7 +14,7 @@ Don't introduce a server, fetch, or third-party runtime call without flagging it
 npm install
 npm run dev      # vite dev server on :5173 (also on LAN — see README for phone testing)
 npm run build    # production build → ./dist
-npm run preview  # serve ./dist on :4173
+npm run preview  # build, then serve ./dist via the Workers runtime (wrangler dev) on :8787
 npm test         # run the Vitest unit tests once (npm run test:watch to watch)
 npm run render   # render staff glyphs (Basics + Phase 1/2/3 + Intervals) to ./render-out/*.svg (dev-only)
 npm run drive    # drive the app in a headless Chrome over CDP (dev-only smoke tests)
@@ -61,17 +61,22 @@ Svelte 5 + Vite SPA. View-switching by simple state, no router.
     deck + curriculum data) for Chords / Key Signatures / Intervals; each exports
     a `build*Deck`, an option pool + labels, and a `*LevelsFor` bucketer passed to
     `progression.js` as its `levelsFn`. Same shape, so a new phase copies one.
-  - `render.js` — VexFlow-free shared staff rendering (one `draw*` per card kind),
-    used by both the quiz views and the dev `render` script (output can't drift).
-  - `spaced-repetition.js` — generic Leitner scheduler. **Keep it
+  - `render.js` — VexFlow-free shared staff rendering (one `draw*` per card kind;
+    takes the `VexFlow` module as a param so it never imports it), used by both the
+    quiz views and the dev `render` script (output can't drift). `cardRender.js`
+    wraps it with the lazy VexFlow boot + a card→draw dispatch, shared by the
+    Progress drill-down and the dev gallery.
+  - `spaced-repetition.js` — generic Leitner scheduler + per-card stats. **Keep it
     card-agnostic** (no knowledge of notes/chords/levels) so every phase reuses
     it and the SM-2 swap stays local. Key fns: `pickNext` (takes an optional
     `newPool`), `recordAnswer`, `boxAtLeast`, `summary`.
   - `progression.js` — the curriculum layer on top of the scheduler
     (`progress`, `advance`, `MASTER_BOX`).
-  - `settings.svelte.js` — reactive, persisted quiz settings.
+  - `transfer.js` — state export/import (one versioned JSON backup of all `srt:*`
+    keys); `settings.svelte.js` — reactive, persisted quiz settings.
   - `phases.js` — single source of truth for phase id↔display-name mapping.
-  - `Piano.svelte`, `QuizSettings.svelte`, `theme.svelte.js`, `nav.svelte.js`.
+  - `Choices.svelte` (multiple-choice answer pad), `Piano.svelte`,
+    `QuizSettings.svelte`, `theme.svelte.js`, `nav.svelte.js`.
 - `src/app.css` — global styles + dark-mode theme tokens.
 
 ## Conventions that matter

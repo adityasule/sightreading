@@ -17,7 +17,7 @@ import { levelsFor } from './music.js';
 import { boxAtLeast, masteredCount } from './spaced-repetition.js';
 
 // A level is complete once every card in it has been reviewed correctly twice
-// (Leitner box ≥ 2). See GOALS.md → Design Notes → Learning progression.
+// (Leitner box ≥ 2). See HISTORY.md → Learning progression.
 export const MASTER_BOX = 2;
 
 // Seed `unlocked` for a blob that doesn't have it yet. Brand-new users land on

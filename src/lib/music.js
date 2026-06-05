@@ -142,8 +142,7 @@ export function buildDeck(settings) {
 // level at a time. Each level adds the fewest new accidentals (the natural
 // difficulty gradient for a reader). A natural minor shares its relative
 // major's note set, so the two pair onto one level for free — hence the
-// "X major / Y minor" labels. Full rationale in GOALS.md → Design Notes →
-// Learning progression.
+// "X major / Y minor" labels. Full rationale in HISTORY.md → Learning progression.
 //
 // Level 1 (C major / A minor) is the naturals foundation, large enough to split
 // by register: on-staff naturals first (quick wins), then the harder ledger
