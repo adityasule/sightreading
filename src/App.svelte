@@ -154,7 +154,11 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 20px;
+    /* Clear the status bar / notch (top) and a landscape side notch
+       (left/right). env() is 0 on devices without cutouts, so this is a no-op
+       on desktop. The bottom edge is the footer's job (see below). */
+    padding: calc(12px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+      12px calc(20px + env(safe-area-inset-left));
     border-bottom: 1px solid var(--border);
   }
 
@@ -206,7 +210,7 @@
   }
 
   main {
-    padding: 24px 20px;
+    padding: 24px calc(20px + env(safe-area-inset-right)) 24px calc(20px + env(safe-area-inset-left));
     min-height: 0;
   }
 
@@ -217,7 +221,8 @@
     align-items: center;
     justify-content: center;
     gap: 6px 16px;
-    padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+    padding: 16px calc(20px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom))
+      calc(20px + env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.8rem;
@@ -283,7 +288,10 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
+    /* Off-canvas drawer pinned to the top-left edge: clear the notch (top) and a
+       landscape left-side notch (left), plus the home indicator (bottom). */
+    padding: calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom))
+      calc(12px + env(safe-area-inset-left));
     background: var(--surface);
     border-right: 1px solid var(--border);
     box-shadow: var(--shadow);
@@ -347,11 +355,13 @@
       gap: 2px;
       border-right: 1px solid var(--border);
       box-shadow: none;
-      padding: 16px 12px;
+      /* Sidebar hugs the left edge — clear a landscape left-side notch. */
+      padding: 16px 12px 16px calc(12px + env(safe-area-inset-left));
     }
     main {
       grid-area: main;
-      padding: 32px;
+      /* Content hugs the right edge in this layout (left is the sidebar). */
+      padding: 32px calc(32px + env(safe-area-inset-right)) 32px 32px;
     }
     .tab {
       font-size: 0.92rem;
